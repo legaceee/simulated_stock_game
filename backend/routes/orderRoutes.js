@@ -13,6 +13,6 @@ router.get("/", getAllStocks);
 
 router.get("/:search", searchStocks);
 router.get("/sym/:symbol", getStockBySymbol);
-router.post("/buy/:symbol", requireAuth, placeOrder, buyStock);
+router.post("/buy/:symbol", requireAuth, buyStock);
 router.post("/sell/:symbol", requireAuth, sellStock);
 export default router;

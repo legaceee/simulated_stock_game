@@ -5,6 +5,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Footer from "./assets/Component/Footer";
 import GuestNavbar from "./assets/Component/GuestNavbar";
 import { ModalProvider } from "../Context/ModalContext";
+import { AuthProvider } from "../Context/AuthContext";
 import ModalRoot from "./assets/Component/ModalRoot";
 import AccountPage from "./pages/AccountPage";
 import Stock from "./pages/Stock";
@@ -14,15 +15,17 @@ function App() {
   return (
     <GoogleOAuthProvider clientId={clientId}>
       <BrowserRouter>
-        <ModalProvider>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/loggedIn" element={<AccountPage />} />
-            <Route path="/foot" element={<Footer />} />
-            <Route path="/stock/:id" element={<Stock />} />
-          </Routes>
-          <ModalRoot />
-        </ModalProvider>
+        <AuthProvider>
+          <ModalProvider>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/loggedIn" element={<AccountPage />} />
+              <Route path="/foot" element={<Footer />} />
+              <Route path="/stock/:id" element={<Stock />} />
+            </Routes>
+            <ModalRoot />
+          </ModalProvider>
+        </AuthProvider>
       </BrowserRouter>
     </GoogleOAuthProvider>
   );

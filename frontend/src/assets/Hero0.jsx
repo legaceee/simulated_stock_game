@@ -3,7 +3,7 @@ import Button from "./Component/Button";
 function Hero0() {
   return (
     <>
-      <div className="flex flex-col justify-center mt-24 sm:mt-28 text-center bg-white">
+      <div className="flex flex-col justify-center mt-6 sm:mt-10 text-center bg-white">
         <h2 className="text-4xl sm:text-5xl lg:text-[75px] font-semibold text-slate-700 leading-tight">
           All things finance,
           <br /> Right here!

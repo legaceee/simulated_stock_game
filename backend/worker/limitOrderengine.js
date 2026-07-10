@@ -1,7 +1,7 @@
 import Redis from "ioredis";
 import prisma from "../config/prismaClient.js";
 
-const sub = new Redis(); // subscribe to your price feed
+const sub = new Redis(process.env.REDIS_URL || "redis://localhost:6379"); // subscribe to your price feed
 sub.subscribe("stock-prices");
 
 sub.on("message", async (_channel, msg) => {

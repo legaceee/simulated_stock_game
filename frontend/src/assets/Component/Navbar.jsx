@@ -40,8 +40,8 @@ export default function Navbar({ children }) {
             </ul>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3 md:gap-4">
-            <div className="relative flex-1">
+          <div className="flex flex-row items-center gap-2 sm:gap-3 md:gap-4">
+            <div className="relative flex-1 min-w-0">
               <input
                 ref={inputEl}
                 type="text"
@@ -56,13 +56,13 @@ export default function Navbar({ children }) {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-              <span className="absolute right-3 top-2 text-gray-400 text-sm pointer-events-none hidden sm:block">
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm pointer-events-none hidden sm:block">
                 Ctrl + K
               </span>
             </div>
 
             {/* Right-side actions (Login button etc.) */}
-            <div className="flex items-center justify-end">{children}</div>
+            <div className="flex items-center justify-end shrink-0">{children}</div>
           </div>
         </div>
       </div>

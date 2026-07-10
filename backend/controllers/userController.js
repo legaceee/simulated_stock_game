@@ -71,7 +71,7 @@ export const getUser = CatchAsync(async (req, res, next) => {
   }
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, username: true, email: true, createdAt: true },
+    select: { id: true, username: true, email: true, createdAt: true, cashBalance: true },
   });
   if (!user) {
     return next(new AppError("User not found", 404));

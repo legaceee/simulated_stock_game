@@ -179,6 +179,9 @@ export const sellStock = async (req, res) => {
 
     const result = await prisma.$transaction(async (tx) => {
       const portfolio = await tx.portfolio.findFirst({ where: { userId } });
+      if (!portfolio) {
+        throw new Error("Not enough shares to sell");
+      }
       const portfolioItem = await tx.portfolioItem.findFirst({
         where: { portfolioId: portfolio.id, stockId },
       });

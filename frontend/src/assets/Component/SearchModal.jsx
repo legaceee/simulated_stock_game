@@ -9,12 +9,7 @@ export default function SearchModal({ onClose }) {
   const [search, setSearch] = useState("");
   const [result, setResults] = useState([]);
   const navigate = useNavigate();
-  // focus the modal input & lock body scroll
-  const onKeyDown = (e) => {
-    if (e.key === "Escape") {
-      onClose();
-    }
-  };
+
   const handleInputChange = (event) => {
     setSearch(event.target.value);
   };
@@ -26,10 +21,16 @@ export default function SearchModal({ onClose }) {
     inputRef.current?.focus();
     document.body.classList.add("overflow-hidden");
 
-    window.addEventListener("keydown", onKeyDown);
+    function handleKeyDown(e) {
+      if (e.key === "Escape") {
+        onClose?.();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
     return () => {
       document.body.classList.remove("overflow-hidden");
-      window.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("keydown", handleKeyDown);
     };
   }, [onClose]);
   useEffect(() => {
@@ -77,23 +78,20 @@ export default function SearchModal({ onClose }) {
   return (
     // overlay
     <Modal onClose={onClose}>
-      {/* search input */}
-      <div
-        className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl ring-1 ring-black/10"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="relative p-4 border-b">
-          <SearchIcon className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+      <div className="flex flex-col max-h-[calc(100vh-2rem)] overflow-hidden">
+        {/* search input */}
+        <div className="relative p-3 sm:p-4 border-b">
+          <SearchIcon className="absolute left-4 sm:left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
             ref={inputRef}
             type="text"
             placeholder="Search INVESTnow..."
-            className="w-full pl-10 pr-10 py-3 rounded-lg outline-none placeholder-gray-400"
+            className="w-full pl-10 pr-10 py-2.5 sm:py-3 rounded-lg outline-none placeholder-gray-400 text-sm sm:text-base"
             value={search}
             onChange={handleInputChange}
           />
           <button
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             onClick={onClose}
             aria-label="Close"
           >
@@ -102,7 +100,7 @@ export default function SearchModal({ onClose }) {
         </div>
 
         {/* chips */}
-        <div className="px-4 py-3 flex flex-wrap gap-2 text-sm">
+        <div className="px-3 sm:px-4 py-3 flex flex-wrap gap-2 text-xs sm:text-sm">
           {["All", "Stocks", "F&O", "Mutual Funds", "ETF", "FAQs"].map(
             (t, i) => (
               <button
@@ -120,11 +118,11 @@ export default function SearchModal({ onClose }) {
         </div>
 
         {/* list */}
-        <div className="px-4 pb-4">
+        <div className="px-3 sm:px-4 pb-4 flex-1 min-h-0">
           <p className="text-sm font-medium text-gray-500 mb-2">
             Popular on INVESTnow
           </p>
-          <ul className="max-h-72 overflow-auto">
+          <ul className="h-full overflow-y-auto">
             {result.map((item) => (
               <li
                 key={item.id}
@@ -132,7 +130,10 @@ export default function SearchModal({ onClose }) {
                 onClick={() => handleClick(item)}
               >
                 <span className="text-gray-300">↗</span>
-                <span>{item.companyName}</span>
+                <div className="flex flex-col">
+                  <span className="font-bold text-sm text-gray-800">{item.symbol}</span>
+                  <span className="text-xs text-gray-400">{item.companyName}</span>
+                </div>
               </li>
             ))}
           </ul>

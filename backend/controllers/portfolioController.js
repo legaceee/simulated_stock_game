@@ -10,9 +10,9 @@ export const getPortfolio = async (req, res) => {
       where: { userId },
       include: {
         portfolioItems: {
-          // include: {
-          //   stock: true,
-          // },
+          include: {
+            stock: true,
+          },
         },
       },
     });
