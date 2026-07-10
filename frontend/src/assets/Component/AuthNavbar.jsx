@@ -1,11 +1,27 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import Navbar from "./Navbar";
 import Avatar, { genConfig } from "react-nice-avatar";
 import UserProfile from "./UserProfile";
+import { useAuth } from "../../Context/AuthContext";
 
 function AuthNavbar() {
   const [clicked, setClicked] = useState(false);
-  const config = genConfig();
+  const { user } = useAuth();
+
+  const config = useMemo(() => {
+    const email = user?.email || "guest";
+    const cacheKey = `avatar-config-${email}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (e) {}
+    }
+    const newConfig = genConfig();
+    localStorage.setItem(cacheKey, JSON.stringify(newConfig));
+    return newConfig;
+  }, [user?.email]);
+
   const dropdownRef = useRef(null);
 
   // Close on outside click

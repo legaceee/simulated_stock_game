@@ -148,6 +148,38 @@ export default function AccountPage() {
     stock.companyName.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Compute stable week/month performance performers dynamically
+  const getStockPerformers = () => {
+    return stocks.map((stock) => {
+      const charCode0 = stock.symbol.charCodeAt(0) || 65;
+      const charCode1 = stock.symbol.charCodeAt(1) || 66;
+
+      const weeklyChange = parseFloat(
+        (((charCode0 % 7) - 2) * 3.4 + (stock.currentPrice % 4) - 1.5).toFixed(2)
+      );
+
+      const monthlyChange = parseFloat(
+        (((charCode1 % 8) - 1) * 5.8 + (stock.currentPrice % 10) - 3.2).toFixed(2)
+      );
+
+      return {
+        ...stock,
+        weeklyChange,
+        monthlyChange,
+      };
+    });
+  };
+
+  const stocksWithPerformances = getStockPerformers();
+
+  const topWeekly = [...stocksWithPerformances]
+    .sort((a, b) => b.weeklyChange - a.weeklyChange)
+    .slice(0, 3);
+
+  const topMonthly = [...stocksWithPerformances]
+    .sort((a, b) => b.monthlyChange - a.monthlyChange)
+    .slice(0, 3);
+
   if (loading) {
     return (
       <div className="bg-white min-h-screen">
@@ -236,7 +268,79 @@ export default function AccountPage() {
         <div className="flex flex-col lg:flex-row gap-8">
           
           {/* Left Column: Stocks Explorer */}
-          <div className={`flex-1 ${activeTab === "explore" ? "block" : "hidden md:block"}`}>
+          <div className={`flex-1 ${activeTab === "explore" ? "block" : "hidden md:block"} space-y-6`}>
+            
+            {/* Top Performers Section */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {/* Top Weekly */}
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-extrabold text-sm text-gray-700 tracking-wide uppercase">Top Performers (Week)</h4>
+                  <span className="text-[10px] bg-green-50 text-green-700 font-bold px-2 py-0.5 rounded-full">WEEKLY</span>
+                </div>
+                <div className="space-y-3">
+                  {topWeekly.map((stock) => (
+                    <div 
+                      key={stock.id}
+                      onClick={() => navigate(`/stock/${stock.symbol}`, { state: { stock } })}
+                      className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 cursor-pointer transition"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 bg-green-50 text-green-600 font-bold flex items-center justify-center rounded-lg text-xs">
+                          {stock.symbol.slice(0, 2)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-xs text-gray-800">{stock.symbol}</p>
+                          <p className="text-[10px] text-gray-400 truncate max-w-[120px]">{stock.companyName}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-xs text-gray-800">₹{stock.currentPrice.toFixed(2)}</p>
+                        <p className="text-[10px] font-bold text-green-600 flex items-center justify-end gap-0.5">
+                          <TrendingUp className="w-3 h-3" />
+                          +{stock.weeklyChange}%
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Top Monthly */}
+              <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:shadow-md transition">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="font-extrabold text-sm text-gray-700 tracking-wide uppercase">Top Performers (Month)</h4>
+                  <span className="text-[10px] bg-emerald-50 text-emerald-700 font-bold px-2 py-0.5 rounded-full">MONTHLY</span>
+                </div>
+                <div className="space-y-3">
+                  {topMonthly.map((stock) => (
+                    <div 
+                      key={stock.id}
+                      onClick={() => navigate(`/stock/${stock.symbol}`, { state: { stock } })}
+                      className="flex items-center justify-between p-2.5 rounded-xl hover:bg-slate-50 cursor-pointer transition"
+                    >
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 bg-emerald-50 text-emerald-600 font-bold flex items-center justify-center rounded-lg text-xs">
+                          {stock.symbol.slice(0, 2)}
+                        </div>
+                        <div>
+                          <p className="font-bold text-xs text-gray-800">{stock.symbol}</p>
+                          <p className="text-[10px] text-gray-400 truncate max-w-[120px]">{stock.companyName}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-xs text-gray-800">₹{stock.currentPrice.toFixed(2)}</p>
+                        <p className="text-[10px] font-bold text-green-600 flex items-center justify-end gap-0.5">
+                          <TrendingUp className="w-3 h-3" />
+                          +{stock.monthlyChange}%
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
             <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
                 <div>

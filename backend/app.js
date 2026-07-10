@@ -17,12 +17,17 @@ const app = express();
 // Middleware
 app.use(helmet());
 const limiter = rateLimit({
-  max: 100,
+  max: 100000, // relaxed for development and testing
   windowMs: 60 * 60 * 1000,
   message: "too many req from this ip ,please try again in an hour",
 });
 app.use("/api", limiter);
-app.use(cors());
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 // for parsing application/json

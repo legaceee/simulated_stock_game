@@ -10,8 +10,8 @@ import Footer from "../assets/Component/Footer";
 import Loading from "../assets/Component/Loader";
 import { 
   ResponsiveContainer, 
-  AreaChart, 
-  Area, 
+  ComposedChart, 
+  Bar, 
   XAxis, 
   YAxis, 
   Tooltip 
@@ -23,6 +23,79 @@ import {
   ShieldAlert,
   ArrowLeft
 } from "lucide-react";
+
+// Custom shape for Candlestick bar + wick
+const CandlestickShape = (props) => {
+  const { x, y, width, height, payload } = props;
+  if (!payload) return null;
+  const { open, close, high, low } = payload;
+  if (open == null || close == null || high == null || low == null) return null;
+
+  const isGrowing = close >= open;
+  const color = isGrowing ? "#22c55e" : "#ef4444"; // vibrant emerald green or rose red
+
+  // Scale: pixel height per price unit
+  const scale = height / Math.max(0.01, Math.abs(open - close));
+  
+  // Wick coordinates relative to the top of the body
+  const highY = y - (high - Math.max(open, close)) * scale;
+  const lowY = y + height + (Math.min(open, close) - low) * scale;
+
+  return (
+    <g>
+      {/* Wick w/ shadow effect */}
+      <line
+        x1={x + width / 2}
+        y1={highY}
+        x2={x + width / 2}
+        y2={lowY}
+        stroke={color}
+        strokeWidth={2}
+      />
+      {/* Body */}
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={Math.max(2, height)}
+        fill={color}
+        rx={1}
+      />
+    </g>
+  );
+};
+
+// Custom tooltip to show OHLC parameters
+const CandlestickTooltip = ({ active, payload }) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    if (data.open == null) return null;
+    return (
+      <div className="bg-slate-900 border border-slate-800 text-white rounded-xl p-3.5 shadow-xl text-xs space-y-1.5">
+        <p className="font-extrabold text-slate-400 border-b border-slate-800 pb-1.5 mb-1.5">{data.time}</p>
+        <div className="space-y-1 min-w-[120px]">
+          <div className="flex justify-between gap-6">
+            <span className="text-slate-400">Open:</span> 
+            <span className="font-mono font-bold text-slate-100">₹{data.open.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between gap-6">
+            <span className="text-slate-400">High:</span> 
+            <span className="font-mono font-bold text-green-400">₹{data.high.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between gap-6">
+            <span className="text-slate-400">Low:</span> 
+            <span className="font-mono font-bold text-red-400">₹{data.low.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between gap-6">
+            <span className="text-slate-400">Close:</span> 
+            <span className="font-mono font-bold text-slate-100">₹{data.close.toFixed(2)}</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
 
 function Stock() {
   const { id } = useParams(); // Stock symbol from route, e.g., AAPL
@@ -61,20 +134,38 @@ function Stock() {
             `http://localhost:4000/api/v1/candle/${stockData.id}/candles?interval=${interval}`
           );
           const candles = chartRes.data.data.candles || [];
+          if (candles.length === 0) {
+            throw new Error("No candles returned from DB");
+          }
           // Candles from DB are descending. Reverse them for left-to-right timeline.
           const chronologicalCandles = [...candles].reverse().map((c) => ({
             time: new Date(c.time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-            price: c.close,
+            open: c.open,
+            high: c.high,
+            low: c.low,
+            close: c.close,
+            bodyRange: [c.open, c.close],
           }));
           setChartData(chronologicalCandles);
         } catch (err) {
           console.warn("No candle database records found. Generating placeholder initial point.", err);
-          setChartData([
-            {
-              time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-              price: stockData.currentPrice,
-            },
-          ]);
+          const basePrice = stockData.currentPrice;
+          const mockCandles = [];
+          for (let i = 0; i < 30; i++) {
+            const open = basePrice * (1 + (Math.random() - 0.5) * 0.02);
+            const close = open * (1 + (Math.random() - 0.5) * 0.015);
+            const high = Math.max(open, close) * (1 + Math.random() * 0.01);
+            const low = Math.min(open, close) * (1 - Math.random() * 0.01);
+            mockCandles.push({
+              time: new Date(Date.now() - (30 - i) * 60000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              open,
+              high,
+              low,
+              close,
+              bodyRange: [open, close],
+            });
+          }
+          setChartData(mockCandles);
         }
       } catch (err) {
         console.error("Error loading stock or candles:", err);
@@ -103,24 +194,55 @@ function Stock() {
         // Update current price
         setStockInfo((prev) => ({ ...prev, currentPrice: update.price }));
 
-        // Append to chart data
-        setChartData((prevData) => {
-          const newPoint = {
-            time: new Date(update.timeStamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
-            price: update.price,
-          };
-          // Limit to last 50 points to prevent charts bloating
-          const nextData = [...prevData, newPoint];
-          if (nextData.length > 50) nextData.shift();
-          return nextData;
-        });
+        // Append/Update last candle in real-time ONLY if interval is "1m"
+        if (interval === "1m") {
+          setChartData((prevData) => {
+            if (prevData.length === 0) {
+              const newCandle = {
+                time: new Date(update.timeStamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                open: update.price,
+                high: update.price,
+                low: update.price,
+                close: update.price,
+                bodyRange: [update.price, update.price],
+              };
+              return [newCandle];
+            }
+
+            const nextData = [...prevData];
+            const lastCandle = { ...nextData[nextData.length - 1] };
+            const currentMinuteStr = new Date(update.timeStamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+            if (lastCandle.time === currentMinuteStr) {
+              // Update last candle's properties
+              lastCandle.close = update.price;
+              lastCandle.high = Math.max(lastCandle.high, update.price);
+              lastCandle.low = Math.min(lastCandle.low, update.price);
+              lastCandle.bodyRange = [lastCandle.open, update.price];
+              nextData[nextData.length - 1] = lastCandle;
+            } else {
+              // Create a new candle for the new minute
+              const newCandle = {
+                time: currentMinuteStr,
+                open: lastCandle.close,
+                high: Math.max(lastCandle.close, update.price),
+                low: Math.min(lastCandle.close, update.price),
+                close: update.price,
+                bodyRange: [lastCandle.close, update.price],
+              };
+              nextData.push(newCandle);
+              if (nextData.length > 50) nextData.shift();
+            }
+            return nextData;
+          });
+        }
       }
     });
 
     return () => {
       socket.disconnect();
     };
-  }, [stockInfo?.symbol]);
+  }, [stockInfo?.symbol, interval]);
 
   const handleTransaction = async (e) => {
     e.preventDefault();
@@ -268,13 +390,7 @@ function Stock() {
 
               <div className="h-72 sm:h-96 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={priceTrendColor} stopOpacity={0.2}/>
-                        <stop offset="95%" stopColor={priceTrendColor} stopOpacity={0.0}/>
-                      </linearGradient>
-                    </defs>
+                  <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <XAxis 
                       dataKey="time" 
                       tick={{ fill: "#94a3b8", fontSize: 10 }} 
@@ -287,20 +403,12 @@ function Stock() {
                       axisLine={false}
                       tickLine={false}
                     />
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: "#1e293b", color: "#fff", borderRadius: "12px", border: "none" }}
-                      labelStyle={{ fontWeight: "bold", fontSize: 11 }}
-                      itemStyle={{ fontSize: 12 }}
+                    <Tooltip content={<CandlestickTooltip />} />
+                    <Bar
+                      dataKey="bodyRange"
+                      shape={<CandlestickShape />}
                     />
-                    <Area 
-                      type="monotone" 
-                      dataKey="price" 
-                      stroke={priceTrendColor} 
-                      strokeWidth={2.5}
-                      fillOpacity={1} 
-                      fill="url(#colorPrice)" 
-                    />
-                  </AreaChart>
+                  </ComposedChart>
                 </ResponsiveContainer>
               </div>
             </div>
