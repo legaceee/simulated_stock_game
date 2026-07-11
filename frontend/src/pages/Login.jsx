@@ -47,7 +47,7 @@ function Login() {
     setLoading(false);
     if (res.success) {
       closeModal();
-      navigate("/loggedIn");
+      navigate("/dashboard");
     } else {
       setError(res.error);
     }
@@ -115,7 +115,7 @@ function Login() {
     setLoading(false);
     if (res.success) {
       closeModal();
-      navigate("/loggedIn");
+      navigate("/dashboard");
     } else {
       setError(res.error);
     }

@@ -1,5 +1,6 @@
 import { CatchAsync } from "../utils/catchAsync.js";
 import prisma from "../config/prismaClient.js"; // Prisma client instance
+import bcrypt from "bcryptjs";
 
 import Fuse from "fuse.js";
 import AppError from "../utils/appError.js";
@@ -77,8 +78,28 @@ export const searchStocks = async (req, res) => {
 
 export const buyStock = async (req, res) => {
   try {
-    const { stockId, buyQuantity, currentPrice } = req.body;
+    const { stockId, buyQuantity, currentPrice, mpin } = req.body;
     const userId = req.user.id;
+
+    // Validate MPIN
+    const userWithMpin = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { mpin: true }
+    });
+
+    if (!userWithMpin || !userWithMpin.mpin) {
+      return res.status(400).json({ error: "Please set your transaction MPIN first." });
+    }
+
+    if (!mpin) {
+      return res.status(400).json({ error: "Please enter your transaction MPIN." });
+    }
+
+    const isMpinCorrect = await bcrypt.compare(mpin, userWithMpin.mpin);
+    if (!isMpinCorrect) {
+      return res.status(400).json({ error: "Incorrect transaction MPIN." });
+    }
+
     console.log(userId);
     const quantity = Number(buyQuantity);
     const price = Number(currentPrice);
@@ -166,8 +187,27 @@ export const buyStock = async (req, res) => {
 
 export const sellStock = async (req, res) => {
   try {
-    const { stockId, sellQuantity, currentPrice } = req.body;
+    const { stockId, sellQuantity, currentPrice, mpin } = req.body;
     const userId = req.user.id;
+
+    // Validate MPIN
+    const userWithMpin = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { mpin: true }
+    });
+
+    if (!userWithMpin || !userWithMpin.mpin) {
+      return res.status(400).json({ error: "Please set your transaction MPIN first." });
+    }
+
+    if (!mpin) {
+      return res.status(400).json({ error: "Please enter your transaction MPIN." });
+    }
+
+    const isMpinCorrect = await bcrypt.compare(mpin, userWithMpin.mpin);
+    if (!isMpinCorrect) {
+      return res.status(400).json({ error: "Incorrect transaction MPIN." });
+    }
 
     const quantity = Number(sellQuantity);
     const price = Number(currentPrice);

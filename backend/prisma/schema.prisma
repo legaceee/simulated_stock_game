@@ -31,6 +31,7 @@ model User {
   kycDocument    String? // file path or URL to uploaded document
   role           Role          @default(USER)
   passwordChangedAt DateTime?
+  mpin           String?
   updatedAt      DateTime      @updatedAt
   portfolios     Portfolio[]
   transactions   Transaction[]

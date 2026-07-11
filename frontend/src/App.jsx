@@ -9,6 +9,7 @@ import { AuthProvider } from "../Context/AuthContext";
 import ModalRoot from "./assets/Component/ModalRoot";
 import AccountPage from "./pages/AccountPage";
 import Stock from "./pages/Stock";
+import Leaderboard from "./pages/Leaderboard";
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 function App() {
@@ -19,7 +20,8 @@ function App() {
           <ModalProvider>
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route path="/loggedIn" element={<AccountPage />} />
+              <Route path="/dashboard" element={<AccountPage />} />
+              <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/foot" element={<Footer />} />
               <Route path="/stock/:id" element={<Stock />} />
             </Routes>

@@ -8,6 +8,7 @@ import AuthNavbar from "../assets/Component/AuthNavbar";
 import GuestNavbar from "../assets/Component/GuestNavbar";
 import Footer from "../assets/Component/Footer";
 import Loading from "../assets/Component/Loader";
+import MpinModal from "../assets/Component/MpinModal";
 import { 
   ResponsiveContainer, 
   ComposedChart, 
@@ -116,6 +117,7 @@ function Stock() {
   const [transactionMessage, setTransactionMessage] = useState(null);
   const [transactionError, setTransactionError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showMpinModal, setShowMpinModal] = useState(false);
 
   // Fetch Stock Info and historical candles
   useEffect(() => {
@@ -244,7 +246,7 @@ function Stock() {
     };
   }, [stockInfo?.symbol, interval]);
 
-  const handleTransaction = async (e) => {
+  const handleTransaction = (e) => {
     e.preventDefault();
     if (!token) {
       openModal("login");
@@ -254,15 +256,22 @@ function Stock() {
       setTransactionError("Please enter a valid quantity.");
       return;
     }
+    setTransactionError(null);
+    setTransactionMessage(null);
+    setShowMpinModal(true);
+  };
 
+  const executeTradeWithMpin = async (mpin) => {
     setSubmitting(true);
     setTransactionError(null);
     setTransactionMessage(null);
+    setShowMpinModal(false);
 
     const price = stockInfo.currentPrice;
     const body = {
       stockId: stockInfo.id,
       currentPrice: price,
+      mpin: mpin,
     };
 
     if (tradeType === "BUY") {
@@ -318,7 +327,7 @@ function Stock() {
       <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 mt-24 mb-12 flex-1">
         {/* Back Link */}
         <button
-          onClick={() => navigate(token ? "/loggedIn" : "/")}
+          onClick={() => navigate(token ? "/dashboard" : "/")}
           className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-green-600 transition mb-6"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -567,6 +576,19 @@ function Stock() {
 
         </div>
       </div>
+      {showMpinModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <MpinModal
+            token={token}
+            actionType={tradeType === "BUY" ? "buy" : "sell"}
+            stockSymbol={stockInfo.symbol}
+            quantity={quantity}
+            totalValue={totalCost}
+            onClose={() => setShowMpinModal(false)}
+            onSuccess={executeTradeWithMpin}
+          />
+        </div>
+      )}
       <Footer />
     </div>
   );

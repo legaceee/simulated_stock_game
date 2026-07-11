@@ -83,3 +83,101 @@ export const getUser = CatchAsync(async (req, res, next) => {
     },
   });
 });
+
+export const getLeaderboard = CatchAsync(async (req, res) => {
+  const users = await prisma.user.findMany({
+    select: {
+      id: true,
+      username: true,
+      email: true,
+      cashBalance: true,
+      avatarUrl: true,
+      portfolios: {
+        select: {
+          portfolioItems: {
+            select: {
+              quantity: true,
+              stock: {
+                select: {
+                  currentPrice: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const leaderboard = users.map((user) => {
+    let stockValue = 0;
+    if (user.portfolios && user.portfolios.length > 0) {
+      user.portfolios.forEach((portfolio) => {
+        portfolio.portfolioItems.forEach((item) => {
+          if (item.stock) {
+            stockValue += item.quantity * item.stock.currentPrice;
+          }
+        });
+      });
+    }
+    const netWorth = user.cashBalance + stockValue;
+    return {
+      id: user.id,
+      username: user.username || user.email.split("@")[0],
+      cashBalance: user.cashBalance,
+      stockValue: stockValue,
+      netWorth: Number(netWorth.toFixed(2)),
+      avatarUrl: user.avatarUrl,
+    };
+  });
+
+  leaderboard.sort((a, b) => b.netWorth - a.netWorth);
+
+  const rankedLeaderboard = leaderboard.map((user, index) => ({
+    ...user,
+    rank: index + 1,
+  }));
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      leaderboard: rankedLeaderboard,
+    },
+  });
+});
+
+export const setMpin = CatchAsync(async (req, res, next) => {
+  const userId = req.user.id;
+  const { mpin } = req.body;
+
+  if (!mpin || !/^\d{4}$/.test(mpin)) {
+    return next(new AppError("MPIN must be a 4-digit number", 400));
+  }
+
+  const hashedMpin = await bcrypt.hash(mpin, 10);
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { mpin: hashedMpin },
+  });
+
+  res.status(200).json({
+    status: "success",
+    message: "MPIN set successfully",
+  });
+});
+
+export const hasMpin = CatchAsync(async (req, res, next) => {
+  const userId = req.user.id;
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { mpin: true },
+  });
+
+  res.status(200).json({
+    status: "success",
+    data: {
+      hasMpin: !!user?.mpin,
+    },
+  });
+});

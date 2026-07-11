@@ -6,6 +6,9 @@ import {
   getAllUsers,
   getUser,
   updateProfile,
+  getLeaderboard,
+  setMpin,
+  hasMpin,
 } from "../controllers/userController.js";
 import {
   signup,
@@ -33,5 +36,9 @@ router.patch("/updatePassword", requireAuth, updatePassword);
 router.patch("/updateME", requireAuth, updateProfile);
 router.get("/getMe", requireAuth, getUser);
 router.get("/getAllUsers", getAllUsers);
+
+router.get("/leaderboard", requireAuth, getLeaderboard);
+router.post("/set-mpin", requireAuth, setMpin);
+router.get("/has-mpin", requireAuth, hasMpin);
 
 export default router;

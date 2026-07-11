@@ -32,11 +32,16 @@ export default function Navbar({ children }) {
                 INVEST<span className="text-green-500">now</span>
               </Link>
             </h1>
-            <ul className="hidden md:flex space-x-4 ml-6">
-              <li className="font-bold">Stocks</li>
-              <li>Crypto</li>
-              <li>Mutual Funds</li>
-              <li>Commodities</li>
+            <ul className="hidden md:flex items-center space-x-6 ml-6 text-sm">
+              <li className="font-bold cursor-pointer hover:text-green-500 transition-colors">
+                <Link to="/dashboard">Stocks</Link>
+              </li>
+              <li className="font-bold cursor-pointer hover:text-green-500 transition-colors">
+                <Link to="/leaderboard">Leaderboard</Link>
+              </li>
+              <li className="text-gray-400">Crypto</li>
+              <li className="text-gray-400">Mutual Funds</li>
+              <li className="text-gray-400">Commodities</li>
             </ul>
           </div>
 
