@@ -146,7 +146,7 @@ function Stock() {
             high: c.high,
             low: c.low,
             close: c.close,
-            bodyRange: [c.open, c.close],
+            bodyRange: [Math.min(c.open, c.close), Math.max(c.open, c.close)],
           }));
           setChartData(chronologicalCandles);
         } catch (err) {
@@ -164,7 +164,7 @@ function Stock() {
               high,
               low,
               close,
-              bodyRange: [open, close],
+              bodyRange: [Math.min(open, close), Math.max(open, close)],
             });
           }
           setChartData(mockCandles);
@@ -220,7 +220,7 @@ function Stock() {
               lastCandle.close = update.price;
               lastCandle.high = Math.max(lastCandle.high, update.price);
               lastCandle.low = Math.min(lastCandle.low, update.price);
-              lastCandle.bodyRange = [lastCandle.open, update.price];
+              lastCandle.bodyRange = [Math.min(lastCandle.open, update.price), Math.max(lastCandle.open, update.price)];
               nextData[nextData.length - 1] = lastCandle;
             } else {
               // Create a new candle for the new minute
@@ -230,7 +230,7 @@ function Stock() {
                 high: Math.max(lastCandle.close, update.price),
                 low: Math.min(lastCandle.close, update.price),
                 close: update.price,
-                bodyRange: [lastCandle.close, update.price],
+                bodyRange: [Math.min(lastCandle.close, update.price), Math.max(lastCandle.close, update.price)],
               };
               nextData.push(newCandle);
               if (nextData.length > 50) nextData.shift();

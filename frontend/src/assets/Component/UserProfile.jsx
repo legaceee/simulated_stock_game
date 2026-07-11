@@ -1,4 +1,5 @@
-import axios from "axios";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../../../Context/AuthContext";
 import {
   Settings,
   LogOut,
@@ -6,85 +7,160 @@ import {
   Headphones,
   ClipboardList,
   Wallet,
+  LayoutDashboard,
+  TrendingUp,
+  Trophy,
+  X
 } from "lucide-react";
-import { useEffect } from "react";
-import { useState } from "react";
-import Loading from "./Loader";
 
-export default function UserProfile() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+export default function UserProfile({ onClose }) {
+  const { user, logoutUser } = useAuth();
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    async function fetchUser() {
-      try {
-        const res = await axios.get(
-          "http://localhost:4000/api/v1/users/getMe",
-          {
-            withCredentials: true, // send cookies/JWT
-          }
-        );
-        setUser(res.data.data.user);
-      } catch (err) {
-        console.error("Failed to fetch user:", err);
-        setUser(null);
-      } finally {
-        setLoading(false);
-      }
-    }
+  const handleLogout = () => {
+    logoutUser();
+    onClose?.();
+    navigate("/");
+  };
 
-    fetchUser();
-  }, []);
-  if (loading) return <Loading />;
-  if (!user) return <p>No user logged in</p>;
-  return (
-    <div className="w-72 bg-white rounded-xl shadow-lg border border-gray-200 p-4">
-      {/* User info */}
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <p className="font-semibold text-gray-900">{user}</p>
-          <p className="text-gray-500 text-xs">{user.email}</p>
+  const handleNavigate = (path) => {
+    navigate(path);
+    onClose?.();
+  };
+
+  if (!user) {
+    return (
+      <div className="fixed inset-0 z-[100] flex">
+        {/* Backdrop overlay */}
+        <div 
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity" 
+          onClick={onClose}
+        />
+        {/* Drawer container */}
+        <div className="fixed top-0 left-0 bottom-0 w-80 sm:w-96 bg-white z-50 shadow-2xl flex flex-col p-6 animate-slide-in-left">
+          <div className="flex justify-between items-center mb-6">
+            <h3 className="font-extrabold text-lg text-gray-800">Profile</h3>
+            <button onClick={onClose} className="p-1.5 hover:bg-slate-100 rounded-xl transition text-gray-500 hover:text-gray-800">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <p className="text-gray-500 text-sm">No user logged in.</p>
         </div>
-        <Settings className="w-4 h-4 text-gray-500 cursor-pointer" />
       </div>
+    );
+  }
 
-      <hr className="my-2" />
+  return (
+    <div className="fixed inset-0 z-[100] flex">
+      {/* Backdrop overlay */}
+      <div 
+        className="fixed inset-0 bg-black/40 backdrop-blur-sm transition-opacity" 
+        onClick={onClose}
+      />
 
-      {/* Menu items */}
-      <div className="flex flex-col space-y-2">
-        <button className="flex items-center gap-3 text-gray-700 hover:bg-gray-100 px-3 py-2 rounded-lg text-sm">
-          <Wallet className="w-4 h-4" />
-          <span>Stocks, F&O balance</span>
-        </button>
+      {/* Drawer Container */}
+      <div className="fixed top-0 left-0 bottom-0 w-80 sm:w-96 bg-white z-50 shadow-2xl flex flex-col justify-between p-6 animate-slide-in-left border-r border-gray-100">
+        
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex justify-between items-center">
+            <h3 className="font-extrabold text-lg text-gray-800">Account Profile</h3>
+            <button 
+              onClick={onClose} 
+              className="p-1.5 hover:bg-slate-50 rounded-xl transition text-gray-500 hover:text-gray-800"
+              aria-label="Close Profile Menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
 
-        <button className="flex items-center gap-3 text-gray-700 hover:bg-gray-100 px-3 py-2 rounded-lg text-sm">
-          <ClipboardList className="w-4 h-4" />
-          <span>All Orders</span>
-        </button>
+          {/* User Info Section */}
+          <div className="bg-slate-50/50 border border-slate-100 rounded-2xl p-4 flex items-center gap-3.5 shadow-sm">
+            <div className="w-12 h-12 bg-green-500 text-white rounded-2xl flex items-center justify-center font-extrabold text-lg shadow-md shadow-green-100 uppercase">
+              {user.username ? user.username.slice(0, 2) : "US"}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-extrabold text-gray-900 text-base truncate">{user.username || "InvestTrader"}</p>
+              <p className="text-gray-400 text-xs font-semibold truncate mt-0.5">{user.email}</p>
+            </div>
+          </div>
 
-        <button className="flex items-center gap-3 text-gray-700 hover:bg-gray-100 px-3 py-2 rounded-lg text-sm">
-          <Headphones className="w-4 h-4" />
-          <span>24 x 7 Customer Support</span>
-        </button>
+          {/* Simulated Balance Badge */}
+          <div className="bg-gradient-to-r from-emerald-500 to-green-600 rounded-2xl p-4 text-white shadow-md">
+            <div className="flex items-center gap-2 text-emerald-100 text-[10px] font-bold uppercase tracking-wider mb-1">
+              <Wallet className="w-3.5 h-3.5" />
+              <span>Simulated Cash Balance</span>
+            </div>
+            <p className="text-xl font-extrabold">
+              ₹{(user.cashBalance ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          </div>
 
-        <button className="flex items-center gap-3 text-gray-700 hover:bg-gray-100 px-3 py-2 rounded-lg text-sm">
-          <FileText className="w-4 h-4" />
-          <span>Reports</span>
-        </button>
-      </div>
+          {/* Menu Options */}
+          <div className="space-y-1.5 pt-2">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2 px-1">Navigation</span>
+            
+            <button 
+              onClick={() => handleNavigate("/dashboard")}
+              className="w-full flex items-center gap-3 text-gray-700 hover:text-green-600 hover:bg-green-50/50 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition"
+            >
+              <LayoutDashboard className="w-4.5 h-4.5" />
+              <span>My Portfolio / Dashboard</span>
+            </button>
 
-      <hr className="my-2" />
+            <button 
+              onClick={() => handleNavigate("/stocks")}
+              className="w-full flex items-center gap-3 text-gray-700 hover:text-green-600 hover:bg-green-50/50 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition"
+            >
+              <TrendingUp className="w-4.5 h-4.5" />
+              <span>Explore Stocks</span>
+            </button>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between px-1">
-        <button className="flex items-center gap-2 text-gray-600 hover:bg-gray-100 px-2 py-1 rounded-lg text-sm">
-          <Settings className="w-4 h-4" />
-          <span>Theme</span>
-        </button>
-        <button className="flex items-center gap-2 text-red-500 hover:bg-red-50 px-2 py-1 rounded-lg text-sm">
-          <LogOut className="w-4 h-4" />
-          <span>Log out</span>
-        </button>
+            <button 
+              onClick={() => handleNavigate("/leaderboard")}
+              className="w-full flex items-center gap-3 text-gray-700 hover:text-green-600 hover:bg-green-50/50 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition"
+            >
+              <Trophy className="w-4.5 h-4.5" />
+              <span>Trader Leaderboard</span>
+            </button>
+          </div>
+
+          {/* Extra options */}
+          <div className="space-y-1.5 pt-2 border-t border-gray-100">
+            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2 px-1">Actions</span>
+
+            <button className="w-full flex items-center gap-3 text-gray-600 hover:bg-slate-50 px-3.5 py-2.5 rounded-xl text-sm font-medium transition">
+              <ClipboardList className="w-4.5 h-4.5 text-gray-400" />
+              <span>All Orders</span>
+            </button>
+
+            <button className="w-full flex items-center gap-3 text-gray-600 hover:bg-slate-50 px-3.5 py-2.5 rounded-xl text-sm font-medium transition">
+              <Headphones className="w-4.5 h-4.5 text-gray-400" />
+              <span>24 x 7 Support</span>
+            </button>
+
+            <button className="w-full flex items-center gap-3 text-gray-600 hover:bg-slate-50 px-3.5 py-2.5 rounded-xl text-sm font-medium transition">
+              <Settings className="w-4.5 h-4.5 text-gray-400" />
+              <span>Account Settings</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Footer actions */}
+        <div className="pt-4 border-t border-gray-100 flex items-center justify-between">
+          <button className="flex items-center gap-2 text-gray-600 hover:bg-slate-50 px-3 py-2 rounded-xl text-sm font-semibold transition">
+            <Settings className="w-4 h-4 text-gray-400" />
+            <span>Theme</span>
+          </button>
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-2 text-red-500 hover:bg-red-50 px-3.5 py-2 rounded-xl text-sm font-bold transition"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Log out</span>
+          </button>
+        </div>
+
       </div>
     </div>
   );

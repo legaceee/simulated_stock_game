@@ -10,6 +10,7 @@ import ModalRoot from "./assets/Component/ModalRoot";
 import AccountPage from "./pages/AccountPage";
 import Stock from "./pages/Stock";
 import Leaderboard from "./pages/Leaderboard";
+import Stocks from "./pages/Stocks";
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
               <Route path="/leaderboard" element={<Leaderboard />} />
               <Route path="/foot" element={<Footer />} />
               <Route path="/stock/:id" element={<Stock />} />
+              <Route path="/stocks" element={<Stocks />} />
             </Routes>
             <ModalRoot />
           </ModalProvider>

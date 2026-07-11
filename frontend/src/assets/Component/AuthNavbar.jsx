@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import Navbar from "./Navbar";
 import Avatar, { genConfig } from "react-nice-avatar";
 import UserProfile from "./UserProfile";
-import { useAuth } from "../../Context/AuthContext";
+import { useAuth } from "../../../Context/AuthContext";
 
 function AuthNavbar() {
   const [clicked, setClicked] = useState(false);
@@ -46,15 +46,13 @@ function AuthNavbar() {
           >
             <Avatar style={{ width: "2rem", height: "2rem" }} {...config} />
           </div>
-
-          {/* Dropdown */}
-          {clicked && (
-            <div className="absolute right-0 mt-2 z-50">
-              <UserProfile />
-            </div>
-          )}
         </div>
       </Navbar>
+
+      {/* Left Drawer Modal */}
+      {clicked && (
+        <UserProfile onClose={() => setClicked(false)} />
+      )}
     </div>
   );
 }

@@ -34,7 +34,7 @@ export default function Navbar({ children }) {
             </h1>
             <ul className="hidden md:flex items-center space-x-6 ml-6 text-sm">
               <li className="font-bold cursor-pointer hover:text-green-500 transition-colors">
-                <Link to="/dashboard">Stocks</Link>
+                <Link to="/stocks">Stocks</Link>
               </li>
               <li className="font-bold cursor-pointer hover:text-green-500 transition-colors">
                 <Link to="/leaderboard">Leaderboard</Link>
