@@ -27,9 +27,13 @@ function AuthNavbar() {
   // Close on outside click
   useEffect(() => {
     function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setClicked(false);
+      if (dropdownRef.current && dropdownRef.current.contains(e.target)) {
+        return;
       }
+      if (e.target.closest(".animate-slide-in-left")) {
+        return;
+      }
+      setClicked(false);
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
