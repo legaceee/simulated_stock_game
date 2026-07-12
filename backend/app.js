@@ -29,7 +29,9 @@ app.use(helmet());
 app.use("/api", redisRateLimiter(200, 900));
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin: function (origin, callback) {
+      callback(null, true);
+    },
     credentials: true,
   })
 );

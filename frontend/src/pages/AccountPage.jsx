@@ -520,6 +520,7 @@ export default function AccountPage() {
           </div>
 
         </div>
+          </>
         )}
 
         {activeMainTab !== "stocks" && (

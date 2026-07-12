@@ -40,6 +40,7 @@ const handleRedisErrors = (err) => {
 };
 
 export default (err, req, res, next) => {
+  console.error("Global Error Handler caught:", err);
   // Default values
   err.statusCode = err.statusCode || 500;
   err.status = err.status || "error";
