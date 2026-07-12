@@ -4,7 +4,7 @@ dotenv.config();
 
 import { createServer } from "http";
 import { Server } from "socket.io";
-import { subscriber } from "./utils/redisClient.js";
+import { publisher, subscriber } from "./utils/redisClient.js";
 
 import app from "./app.js";
 import prisma from "./config/prismaClient.js";
@@ -34,8 +34,17 @@ async function startServer() {
     // symbol -> Set of socket ids
     const symbolSubscriptions = new Map();
 
+    // Reset active connections in Redis
+    await publisher.set("ws:active_clients", 0);
+
     io.on("connection", (socket) => {
       console.log(` client connected: ${socket.id}`);
+      publisher.incr("ws:active_clients");
+
+      socket.on("register", (userId) => {
+        socket.userId = userId;
+        console.log(`Registered socket ${socket.id} to user ${userId}`);
+      });
 
       socket.on("subscribe", (symbols) => {
         // remove old subscriptions
@@ -57,25 +66,37 @@ async function startServer() {
         for (const subs of symbolSubscriptions.values()) {
           subs.delete(socket.id);
         }
+        publisher.decr("ws:active_clients");
         console.log(` client disconnected: ${socket.id}`);
       });
     });
 
     // Redis consumer
     await subscriber.subscribe("stock-prices");
+    await subscriber.subscribe("price-alerts");
+    
     subscriber.on("message", (channel, message) => {
-      if (channel !== "stock-prices") return;
+      if (channel === "stock-prices") {
+        const updates = JSON.parse(message);
 
-      const updates = JSON.parse(message);
+        for (const update of updates) {
+          const subs = symbolSubscriptions.get(update.symbol);
+          if (!subs) continue;
 
-      for (const update of updates) {
-        const subs = symbolSubscriptions.get(update.symbol);
-        if (!subs) continue;
-
-        for (const socketId of subs) {
-          const socket = io.sockets.sockets.get(socketId);
-          if (socket) {
-            socket.emit("price-update", [update]);
+          for (const socketId of subs) {
+            const socket = io.sockets.sockets.get(socketId);
+            if (socket) {
+              socket.emit("price-update", [update]);
+            }
+          }
+        }
+      } else if (channel === "price-alerts") {
+        const alertData = JSON.parse(message);
+        const activeSockets = Array.from(io.sockets.sockets.values());
+        
+        for (const s of activeSockets) {
+          if (s.userId === alertData.userId) {
+            s.emit("alert-triggered", alertData);
           }
         }
       }

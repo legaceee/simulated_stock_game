@@ -12,18 +12,27 @@ services:
     command: npm run dev
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/stockdb
-      - REDIS_URL=redis://redis:6379 #  add redis env here
+      - REDIS_URL=redis://redis:6379
+      - NODE_ENV=development
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - broker-network
 
   frontend:
     build: ./frontend
     ports:
       - "3000:3000"
+    restart: unless-stopped
+    networks:
+      - broker-network
 
   db:
-    image: postgres:15
+    image: postgres:15-alpine
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -32,11 +41,18 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d stockdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - broker-network
 
   redis:
-    image: redis:7
-    command: >
-      redis-server --maxmemory 200mb --maxmemory-policy allkeys-lru
+    image: redis:7-alpine
+    command: redis-server --maxmemory 150mb --maxmemory-policy allkeys-lru
     ports:
       - "6379:6379"
     volumes:
@@ -44,9 +60,21 @@ services:
     deploy:
       resources:
         limits:
-          memory: 300M
-          cpus: "0.50" # limit Redis to half a CPU
+          memory: 200M
+          cpus: "0.50"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - broker-network
 
 volumes:
   pgdata:
   redisdata:
+
+networks:
+  broker-network:
+    driver: bridge

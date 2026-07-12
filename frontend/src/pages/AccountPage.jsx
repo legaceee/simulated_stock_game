@@ -14,8 +14,11 @@ import {
   LineChart, 
   Search, 
   Plus, 
-  Minus 
+  Minus,
+  Coins,
+  Layers
 } from "lucide-react";
+import MfCommodityExplorer from "../assets/Component/MfCommodityExplorer";
 
 export default function AccountPage() {
   const { user, token, logoutUser, refreshUser } = useAuth();
@@ -23,15 +26,18 @@ export default function AccountPage() {
   const [portfolio, setPortfolio] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeTab, setActiveTab] = useState("explore"); // "explore" or "portfolio" for mobile responsiveness
+  const [activeMainTab, setActiveMainTab] = useState("stocks");
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-  // Redirect if not logged in
+  // Redirect if not logged in or if KYC is pending/rejected
   useEffect(() => {
     if (!token) {
       navigate("/");
+    } else if (user && user.kycStatus !== "APPROVED") {
+      navigate("/kyc");
     }
-  }, [token, navigate]);
+  }, [token, user, navigate]);
 
   // Fetch stocks & portfolio
   useEffect(() => {
@@ -244,8 +250,41 @@ export default function AccountPage() {
           </div>
         </div>
 
-        {/* Mobile Tab Toggle */}
-        <div className="flex md:hidden bg-white border border-gray-200 p-1 rounded-xl mb-6 shadow-sm">
+        {/* Main Category Tabs */}
+        <div className="flex bg-white border border-gray-200 p-1.5 rounded-2xl mb-8 shadow-sm max-w-lg">
+          <button
+            className={`flex-1 py-3 text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase ${
+              activeMainTab === "stocks" ? "bg-green-500 text-white shadow-md shadow-green-150" : "text-gray-500 hover:text-slate-700"
+            }`}
+            onClick={() => setActiveMainTab("stocks")}
+          >
+            <LineChart className="w-4 h-4" />
+            Stocks
+          </button>
+          <button
+            className={`flex-1 py-3 text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase ${
+              activeMainTab === "mf" ? "bg-green-500 text-white shadow-md shadow-green-150" : "text-gray-500 hover:text-slate-700"
+            }`}
+            onClick={() => setActiveMainTab("mf")}
+          >
+            <Layers className="w-4 h-4" />
+            Mutual Funds
+          </button>
+          <button
+            className={`flex-1 py-3 text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase ${
+              activeMainTab === "commodities" ? "bg-green-500 text-white shadow-md shadow-green-150" : "text-gray-500 hover:text-slate-700"
+            }`}
+            onClick={() => setActiveMainTab("commodities")}
+          >
+            <Coins className="w-4 h-4" />
+            Commodities
+          </button>
+        </div>
+
+        {activeMainTab === "stocks" && (
+          <>
+            {/* Mobile Tab Toggle */}
+            <div className="flex md:hidden bg-white border border-gray-200 p-1 rounded-xl mb-6 shadow-sm">
           <button
             className={`flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all ${
               activeTab === "explore" ? "bg-green-500 text-white shadow-sm" : "text-gray-500"
@@ -481,6 +520,16 @@ export default function AccountPage() {
           </div>
 
         </div>
+        )}
+
+        {activeMainTab !== "stocks" && (
+          <MfCommodityExplorer
+            token={token}
+            user={user}
+            refreshUser={refreshUser}
+            activeSubTab={activeMainTab}
+          />
+        )}
       </main>
 
       <Footer />

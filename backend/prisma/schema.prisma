@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider      = "prisma-client-js"
   binaryTargets = ["native", "debian-openssl-3.0.x"]
@@ -15,39 +12,76 @@ datasource db {
 }
 
 model User {
-  id             String        @id @default(uuid())
-  email          String        @unique
-  username       String?        @unique
-  password       String?
-  googleId       String?       @unique //stores unique google id
-  avatarUrl      String?
-  cashBalance    Float         @default(0) //  User's available funds
-  reservedCash   Decimal  @default(0)
-    active    Boolean @default(true)
-  createdAt      DateTime      @default(now())
-  
-  emailVerified     Boolean   @default(false)
-  kycStatus      String        @default("PENDING") // PENDING, APPROVED, REJECTED
-  kycDocument    String? // file path or URL to uploaded document
-  role           Role          @default(USER)
-  passwordChangedAt DateTime?
-  mpin           String?
-  updatedAt      DateTime      @updatedAt
-  portfolios     Portfolio[]
-  transactions   Transaction[]
-  watchlistItems Watchlist[]
-  wallet Wallet?
- 
+  id                    String                   @id @default(uuid())
+  email                 String                   @unique
+  username              String?                  @unique
+  password              String?
+  googleId              String?                  @unique
+  avatarUrl             String?
+  cashBalance           Float                    @default(0)
+  reservedCash          Decimal                  @default(0)
+  active                Boolean                  @default(true)
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  emailVerified         Boolean                  @default(false)
+  kycStatus             String                   @default("PENDING") // PENDING, APPROVED, REJECTED
+  kycDocument           String?
+  pan                   String?
+  aadhaar               String?
+  address               String?
+  selfieUrl             String?
+  signatureUrl          String?
+  role                  Role                     @default(USER)
+  passwordChangedAt     DateTime?
+  mpin                  String?
+
+  // Security and Lockout
+  failedLoginAttempts   Int                      @default(0)
+  lockUntil             DateTime?
+
+  // Relations
+  portfolios            Portfolio[]
+  transactions          Transaction[]
+  wallet                Wallet?
+  sessions              Session[]
+  auditLogs             AuditLog[]
+  mfPortfolioItems      MfPortfolioItem[]
+  sipItems              SipItem[]
+  commodityPortfolio    CommodityPortfolioItem[]
+  watchlists            Watchlist[]
+  alerts                PriceAlert[]
 }
 
 model EmailVerification {
   id        String   @id @default(uuid())
- email  String   @unique
+  email     String   @unique
   otpCode   String
   expiresAt DateTime
   createdAt DateTime @default(now())
 }
 
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshToken String   @unique
+  deviceInfo   String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  ipAddress String?
+  details   String?
+  createdAt DateTime @default(now())
+  @@index([userId, createdAt])
+}
 
 model Stock {
   id             String          @id @default(uuid())
@@ -62,16 +96,16 @@ model Stock {
   updatedAt      DateTime        @updatedAt
   portfolioItems PortfolioItem[]
   transactions   Transaction[]
-  watchlistedBy  Watchlist[]
-  candle Candle[]
+  watchlistedBy  WatchlistItem[]
+  candle         Candle[]
 }
 
 model Candle {
   id        String   @id @default(uuid())
-  stock     Stock    @relation(fields: [stockId], references: [id])
+  stock     Stock    @relation(fields: [stockId], references: [id], onDelete: Cascade)
   stockId   String
   interval  String   // "1m", "5m", "15m", "1d"
-  time      DateTime // start of the candle
+  time      DateTime
   open      Float
   high      Float
   low       Float
@@ -81,7 +115,6 @@ model Candle {
   updatedAt DateTime @updatedAt
   @@unique([stockId, interval, time])
 }
-
 
 model Portfolio {
   id             String          @id @default(uuid())
@@ -94,19 +127,19 @@ model Portfolio {
 
 model PortfolioItem {
   id          String    @id @default(uuid())
-  stock       Stock     @relation(fields: [stockId], references: [id])
+  stock       Stock     @relation(fields: [stockId], references: [id], onDelete: Cascade)
   stockId     String
-  portfolio   Portfolio @relation(fields: [portfolioId], references: [id])
+  portfolio   Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
   portfolioId String
   quantity    Int
   avgBuyPrice Float
+  @@index([portfolioId, stockId])
 }
 
 model Transaction {
   id         String          @id @default(uuid())
-  user       User            @relation(fields: [userId], references: [id],onDelete: Cascade)
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId     String
-  stock      Stock?          @relation(fields: [stockId], references: [id])
   stockId    String?
   amount     Float?
   type       TransactionType
@@ -114,40 +147,155 @@ model Transaction {
   price      Float?
   totalValue Float?
   createdAt  DateTime        @default(now())
+  stock      Stock?          @relation(fields: [stockId], references: [id])
+  @@index([userId, createdAt])
+}
+
+model Wallet {
+  id         String   @id @default(uuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String   @unique
+  balance    Int
+  updated_at DateTime @updatedAt
+}
+
+model MutualFund {
+  id             String            @id @default(uuid())
+  symbol         String            @unique
+  name           String
+  nav            Float
+  category       String            // e.g., EQUITY, DEBT, HYBRID, ELSS
+  returns3y      Float
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  portfolioItems MfPortfolioItem[]
+  sipItems       SipItem[]
+  watchlistItems WatchlistItem[]
+}
+
+model MfPortfolioItem {
+  id            String     @id @default(uuid())
+  userId        String
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fundId        String
+  fund          MutualFund @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  units         Float
+  avgNav        Float
+  investedValue Float
+  createdAt     DateTime   @default(now())
+}
+
+model SipItem {
+  id          String     @id @default(uuid())
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fundId      String
+  fund        MutualFund @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  amount      Float
+  frequency   String     // DAILY, WEEKLY, MONTHLY
+  nextDate    DateTime
+  status      String     // ACTIVE, PAUSED, CANCELLED
+  createdAt   DateTime   @default(now())
+}
+
+model Commodity {
+  id             String                   @id @default(uuid())
+  symbol         String                   @unique // GOLD, SILVER, CRUDE_OIL, COPPER
+  name           String
+  currentPrice   Float
+  unit           String
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+  portfolioItems CommodityPortfolioItem[]
+  watchlistItems WatchlistItem[]
+  candle         CommodityCandle[]
+}
+
+model CommodityPortfolioItem {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  commodityId String
+  commodity   Commodity @relation(fields: [commodityId], references: [id], onDelete: Cascade)
+  quantity    Float
+  avgBuyPrice Float
+  createdAt   DateTime  @default(now())
+}
+
+model CommodityCandle {
+  id          String    @id @default(uuid())
+  commodity   Commodity @relation(fields: [commodityId], references: [id], onDelete: Cascade)
+  commodityId String
+  interval    String    // "1m", "5m", "15m", "1d"
+  time        DateTime
+  open        Float
+  high        Float
+  low         Float
+  close       Float
+  volume      Float     @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  @@unique([commodityId, interval, time])
 }
 
 model Watchlist {
-  id        String   @id @default(uuid())
-  user      User     @relation(fields: [userId], references: [id],onDelete: Cascade)
+  id        String          @id @default(uuid())
+  name      String
   userId    String
-  stock     Stock    @relation(fields: [stockId], references: [id])
-  stockId   String
-  createdAt DateTime @default(now())
-
-  @@unique([userId, stockId])
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     WatchlistItem[]
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  @@unique([userId, name])
 }
+
+model WatchlistItem {
+  id          String      @id @default(uuid())
+  watchlistId String
+  watchlist   Watchlist   @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+  stockId     String?
+  stock       Stock?      @relation(fields: [stockId], references: [id], onDelete: Cascade)
+  commodityId String?
+  commodity   Commodity?  @relation(fields: [commodityId], references: [id], onDelete: Cascade)
+  fundId      String?
+  fund        MutualFund? @relation(fields: [fundId], references: [id], onDelete: Cascade)
+  sortOrder   Int         @default(0)
+  createdAt   DateTime    @default(now())
+  @@index([watchlistId, sortOrder])
+}
+
 model Order {
-  id          String   @id @default(uuid())
-  userId      String
-  stockId     String
-  side        String   
-  type        String 
-  limitPrice  Decimal? 
-  qty         Int
-  filledQty   Int      @default(0)
-  status      String   
-  createdAt   DateTime @default(now())
+  id            String   @id @default(uuid())
+  userId        String
+  symbol        String?
+  assetType     String   @default("STOCK") // STOCK, MUTUAL_FUND, COMMODITY
+  side          String
+  type          String
+  limitPrice    Decimal?
+  triggerPrice  Decimal?
+  stopPrice     Decimal?
+  targetPrice   Decimal?
+  qty           Int
+  filledQty     Int      @default(0)
+  status        String   @default("PENDING") // PENDING, EXECUTED, CANCELLED, REJECTED, PARTIAL_FILLED, COMPLETED
+  parentOrderId String?
+  createdAt     DateTime @default(now())
+  stockId       String?
   @@index([stockId, status, side, limitPrice])
 }
 
-model Wallet{
-  id String @id @default(uuid())
-  user User @relation(fields: [userId], references: [id] )
-  userId String @unique
-  balance Int
-  updated_at DateTime
+model PriceAlert {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  symbol    String
+  assetType String   // STOCK, MUTUAL_FUND, COMMODITY
+  condition String   // GT, LT
+  value     Float
+  status    String   // PENDING, TRIGGERED, CANCELLED
+  createdAt DateTime @default(now())
+  @@index([symbol, assetType, status])
 }
-
 
 enum TransactionType {
   BUY
@@ -160,4 +308,3 @@ enum Role {
   USER
   ADMIN
 }
-
