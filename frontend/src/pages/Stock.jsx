@@ -846,24 +846,37 @@ export default function Stock() {
 
                 {/* Submissions */}
                 {token ? (
-                  tradeSide === "BUY" ? (
-                    <button
-                      type="submit"
-                      disabled={submitting || !isAffordable}
-                      className={`w-full text-white font-extrabold py-3.5 rounded-xl shadow-md hover:shadow-lg transition-all text-xs cursor-pointer ${
-                        isAffordable ? "bg-green-500 hover:bg-green-600" : "bg-gray-300 cursor-not-allowed"
-                      }`}
-                    >
-                      {submitting ? "SUBMITTING TRADE..." : isAffordable ? "PLACE BUY ORDER" : "INSUFFICIENT FUNDS"}
-                    </button>
+                  user && user.kycStatus === "APPROVED" ? (
+                    tradeSide === "BUY" ? (
+                      <button
+                        type="submit"
+                        disabled={submitting || !isAffordable}
+                        className={`w-full text-white font-extrabold py-3.5 rounded-xl shadow-md hover:shadow-lg transition-all text-xs cursor-pointer ${
+                          isAffordable ? "bg-green-500 hover:bg-green-600" : "bg-gray-300 cursor-not-allowed"
+                        }`}
+                      >
+                        {submitting ? "SUBMITTING TRADE..." : isAffordable ? "PLACE BUY ORDER" : "INSUFFICIENT FUNDS"}
+                      </button>
+                    ) : (
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="w-full bg-red-500 hover:bg-red-600 text-white font-extrabold py-3.5 rounded-xl shadow-md hover:shadow-lg transition-all text-xs cursor-pointer"
+                      >
+                        {submitting ? "SUBMITTING TRADE..." : "PLACE SELL ORDER"}
+                      </button>
+                    )
                   ) : (
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      className="w-full bg-red-500 hover:bg-red-600 text-white font-extrabold py-3.5 rounded-xl shadow-md hover:shadow-lg transition-all text-xs cursor-pointer"
-                    >
-                      {submitting ? "SUBMITTING TRADE..." : "PLACE SELL ORDER"}
-                    </button>
+                    <div className="w-full text-center p-3.5 bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-bold rounded-xl space-y-2">
+                      <p>Complete and verify your KYC to start investing.</p>
+                      <button
+                        type="button"
+                        onClick={() => navigate("/kyc")}
+                        className="w-full bg-amber-500 hover:bg-amber-600 text-white font-extrabold py-2 rounded-lg text-[10px] cursor-pointer"
+                      >
+                        COMPLETE KYC NOW
+                      </button>
+                    </div>
                   )
                 ) : (
                   <button

@@ -19,6 +19,7 @@ import {
   Layers
 } from "lucide-react";
 import MfCommodityExplorer from "../assets/Component/MfCommodityExplorer";
+import { ResponsiveContainer, PieChart, Pie, Cell, Legend, Tooltip as ChartTooltip } from "recharts";
 
 export default function AccountPage() {
   const { user, token, logoutUser, refreshUser } = useAuth();
@@ -28,7 +29,28 @@ export default function AccountPage() {
   const [activeTab, setActiveTab] = useState("explore"); // "explore" or "portfolio" for mobile responsiveness
   const [activeMainTab, setActiveMainTab] = useState("stocks");
   const [loading, setLoading] = useState(true);
+  const [unifiedPortfolio, setUnifiedPortfolio] = useState(null);
+  const [unifiedLoading, setUnifiedLoading] = useState(false);
   const navigate = useNavigate();
+
+  // Fetch unified portfolio when tab selected
+  useEffect(() => {
+    async function fetchUnifiedData() {
+      if (!token || activeMainTab !== "portfolio") return;
+      try {
+        setUnifiedLoading(true);
+        const res = await axios.get("http://localhost:4000/api/v1/portfolio/unified", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        setUnifiedPortfolio(res.data.data);
+      } catch (err) {
+        console.error("Error fetching unified portfolio:", err);
+      } finally {
+        setUnifiedLoading(false);
+      }
+    }
+    fetchUnifiedData();
+  }, [token, activeMainTab]);
 
   // Redirect if not logged in or if KYC is pending/rejected
   useEffect(() => {
@@ -251,7 +273,7 @@ export default function AccountPage() {
         </div>
 
         {/* Main Category Tabs */}
-        <div className="flex bg-white border border-gray-200 p-1.5 rounded-2xl mb-8 shadow-sm max-w-lg">
+        <div className="flex bg-white border border-gray-200 p-1.5 rounded-2xl mb-8 shadow-sm max-w-xl">
           <button
             className={`flex-1 py-3 text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase ${
               activeMainTab === "stocks" ? "bg-green-500 text-white shadow-md shadow-green-150" : "text-gray-500 hover:text-slate-700"
@@ -278,6 +300,15 @@ export default function AccountPage() {
           >
             <Coins className="w-4 h-4" />
             Commodities
+          </button>
+          <button
+            className={`flex-1 py-3 text-xs font-extrabold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer uppercase ${
+              activeMainTab === "portfolio" ? "bg-green-500 text-white shadow-md shadow-green-150" : "text-gray-500 hover:text-slate-700"
+            }`}
+            onClick={() => setActiveMainTab("portfolio")}
+          >
+            <Briefcase className="w-4 h-4" />
+            Portfolio
           </button>
         </div>
 
@@ -523,13 +554,221 @@ export default function AccountPage() {
           </>
         )}
 
-        {activeMainTab !== "stocks" && (
+        {(activeMainTab === "mf" || activeMainTab === "commodities") && (
           <MfCommodityExplorer
             token={token}
             user={user}
             refreshUser={refreshUser}
             activeSubTab={activeMainTab}
           />
+        )}
+
+        {activeMainTab === "portfolio" && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+            {unifiedLoading ? (
+              <div className="py-20 text-center"><Loading text="Loading unified portfolio..." /></div>
+            ) : unifiedPortfolio ? (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left Side: Summary and Donut Chart */}
+                <div className="lg:col-span-1 space-y-6">
+                  <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-xl relative overflow-hidden">
+                    <h3 className="text-sm font-extrabold text-slate-800 mb-6 flex items-center gap-1.5 uppercase tracking-wider">
+                      <Briefcase className="w-4.5 h-4.5 text-green-500" />
+                      Asset Allocation
+                    </h3>
+                    
+                    {/* Donut Chart container */}
+                    <div className="h-64 relative">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={
+                              [
+                                { name: "Stocks", value: unifiedPortfolio.stocks.currentValue },
+                                { name: "Mutual Funds", value: unifiedPortfolio.mutualFunds.currentValue },
+                                { name: "Commodities", value: unifiedPortfolio.commodities.currentValue }
+                              ].filter(d => d.value > 0).length > 0
+                                ? [
+                                    { name: "Stocks", value: unifiedPortfolio.stocks.currentValue },
+                                    { name: "Mutual Funds", value: unifiedPortfolio.mutualFunds.currentValue },
+                                    { name: "Commodities", value: unifiedPortfolio.commodities.currentValue }
+                                  ].filter(d => d.value > 0)
+                                : [{ name: "No Investments", value: 1 }]
+                            }
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={80}
+                            paddingAngle={5}
+                            dataKey="value"
+                          >
+                            {[
+                              { name: "Stocks", value: unifiedPortfolio.stocks.currentValue },
+                              { name: "Mutual Funds", value: unifiedPortfolio.mutualFunds.currentValue },
+                              { name: "Commodities", value: unifiedPortfolio.commodities.currentValue }
+                            ].filter(d => d.value > 0).length > 0
+                              ? [
+                                  { name: "Stocks", value: unifiedPortfolio.stocks.currentValue },
+                                  { name: "Mutual Funds", value: unifiedPortfolio.mutualFunds.currentValue },
+                                  { name: "Commodities", value: unifiedPortfolio.commodities.currentValue }
+                                ].filter(d => d.value > 0).map((entry, index) => {
+                                  const colors = {
+                                    "Stocks": "#22c55e",
+                                    "Mutual Funds": "#3b82f6",
+                                    "Commodities": "#eab308"
+                                  };
+                                  return <Cell key={`cell-${index}`} fill={colors[entry.name] || "#94a3b8"} />;
+                                })
+                              : <Cell fill="#cbd5e1" />}
+                          </Pie>
+                          <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                          <ChartTooltip formatter={(value, name) => [name === "No Investments" ? "₹0.00" : `₹${Number(value).toFixed(2)}`, name]} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    <div className="mt-6 border-t border-slate-50 pt-4 space-y-3">
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400 font-semibold">Total Invested Value</span>
+                        <span className="font-extrabold text-slate-700">₹{unifiedPortfolio.summary.totalInvested.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-400 font-semibold">Total Current Value</span>
+                        <span className="font-extrabold text-slate-700">₹{unifiedPortfolio.summary.totalCurrentValue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      <div className="flex justify-between text-xs pt-2 border-t border-dashed border-slate-100">
+                        <span className="text-gray-400 font-semibold">Total P&L</span>
+                        <span className={`font-bold ${unifiedPortfolio.summary.totalReturns >= 0 ? "text-green-600" : "text-rose-500"}`}>
+                          ₹{unifiedPortfolio.summary.totalReturns.toFixed(2)} ({unifiedPortfolio.summary.totalPnLPercent.toFixed(2)}%)
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Side: Detailed Breakdown List */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Stocks holdings */}
+                  <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
+                        <LineChart className="w-4 h-4 text-green-500" />
+                        Stocks (₹{unifiedPortfolio.stocks.currentValue.toFixed(2)})
+                      </h4>
+                      <span className={`text-xs font-bold ${unifiedPortfolio.stocks.returns >= 0 ? "text-green-600" : "text-rose-500"}`}>
+                        {unifiedPortfolio.stocks.returns >= 0 ? "+" : ""}
+                        ₹{unifiedPortfolio.stocks.returns.toFixed(2)}
+                      </span>
+                    </div>
+
+                    {unifiedPortfolio.stocks.holdings.length > 0 ? (
+                      <div className="space-y-3">
+                        {unifiedPortfolio.stocks.holdings.map((hold) => (
+                          <div key={hold.id} className="p-4 border border-slate-50 hover:border-slate-100 rounded-2xl flex justify-between items-center text-xs">
+                            <div>
+                              <p className="font-bold text-slate-800 text-sm">{hold.stock?.symbol || "STOCK"}</p>
+                              <p className="text-[10px] text-gray-400 mt-0.5">{hold.quantity} Shares @ Avg ₹{hold.avgBuyPrice.toFixed(2)}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-extrabold text-slate-700">₹{(hold.quantity * (hold.stock?.currentPrice || hold.avgBuyPrice)).toFixed(2)}</p>
+                              <span className={`text-[10px] font-bold ${((hold.stock?.currentPrice || hold.avgBuyPrice) - hold.avgBuyPrice) >= 0 ? "text-green-600" : "text-rose-500"}`}>
+                                {((hold.stock?.currentPrice || hold.avgBuyPrice) - hold.avgBuyPrice) >= 0 ? "+" : ""}
+                                {(((hold.stock?.currentPrice || hold.avgBuyPrice) - hold.avgBuyPrice) * hold.quantity).toFixed(2)}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 py-4 text-center">No stock holdings in portfolio.</p>
+                    )}
+                  </div>
+
+                  {/* Mutual Funds holdings */}
+                  <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
+                        <Layers className="w-4 h-4 text-blue-500" />
+                        Mutual Funds (₹{unifiedPortfolio.mutualFunds.currentValue.toFixed(2)})
+                      </h4>
+                      <span className={`text-xs font-bold ${unifiedPortfolio.mutualFunds.returns >= 0 ? "text-green-600" : "text-rose-500"}`}>
+                        {unifiedPortfolio.mutualFunds.returns >= 0 ? "+" : ""}
+                        ₹{unifiedPortfolio.mutualFunds.returns.toFixed(2)}
+                      </span>
+                    </div>
+
+                    {unifiedPortfolio.mutualFunds.holdings.length > 0 ? (
+                      <div className="space-y-3">
+                        {unifiedPortfolio.mutualFunds.holdings.map((hold) => {
+                          const currentVal = hold.units * (hold.fund?.nav || hold.avgNav);
+                          const pnl = currentVal - hold.investedValue;
+                          return (
+                            <div key={hold.id} className="p-4 border border-slate-50 hover:border-slate-100 rounded-2xl flex justify-between items-center text-xs">
+                              <div>
+                                <p className="font-bold text-slate-800 text-sm">{hold.fund?.name || "MUTUAL FUND"}</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">{hold.units.toFixed(4)} Units @ NAV ₹{(hold.fund?.nav || hold.avgNav).toFixed(2)}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-extrabold text-slate-700">₹{currentVal.toFixed(2)}</p>
+                                <span className={`text-[10px] font-bold ${pnl >= 0 ? "text-green-600" : "text-rose-500"}`}>
+                                  {pnl >= 0 ? "+" : ""}
+                                  ₹{pnl.toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 py-4 text-center">No mutual fund holdings in portfolio.</p>
+                    )}
+                  </div>
+
+                  {/* Commodities holdings */}
+                  <div className="bg-white rounded-3xl border border-gray-100 p-6 shadow-sm">
+                    <div className="flex justify-between items-center mb-4">
+                      <h4 className="text-sm font-extrabold text-slate-800 flex items-center gap-1.5 uppercase tracking-wider">
+                        <Coins className="w-4 h-4 text-yellow-500" />
+                        Commodities (₹{unifiedPortfolio.commodities.currentValue.toFixed(2)})
+                      </h4>
+                      <span className={`text-xs font-bold ${unifiedPortfolio.commodities.returns >= 0 ? "text-green-600" : "text-rose-500"}`}>
+                        {unifiedPortfolio.commodities.returns >= 0 ? "+" : ""}
+                        ₹{unifiedPortfolio.commodities.returns.toFixed(2)}
+                      </span>
+                    </div>
+
+                    {unifiedPortfolio.commodities.holdings.length > 0 ? (
+                      <div className="space-y-3">
+                        {unifiedPortfolio.commodities.holdings.map((hold) => {
+                          const currentVal = hold.quantity * (hold.commodity?.currentPrice || hold.avgBuyPrice);
+                          const pnl = currentVal - (hold.quantity * hold.avgBuyPrice);
+                          return (
+                            <div key={hold.id} className="p-4 border border-slate-50 hover:border-slate-100 rounded-2xl flex justify-between items-center text-xs">
+                              <div>
+                                <p className="font-bold text-slate-800 text-sm">{hold.commodity?.name || "COMMODITY"}</p>
+                                <p className="text-[10px] text-gray-400 mt-0.5">{hold.quantity} Units @ Avg ₹{hold.avgBuyPrice.toFixed(2)}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-extrabold text-slate-700">₹{currentVal.toFixed(2)}</p>
+                                <span className={`text-[10px] font-bold ${pnl >= 0 ? "text-green-600" : "text-rose-500"}`}>
+                                  {pnl >= 0 ? "+" : ""}
+                                  ₹{pnl.toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 py-4 text-center">No commodity holdings in portfolio.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-20 text-gray-400">Failed to load portfolio details.</div>
+            )}
+          </div>
         )}
       </main>
 

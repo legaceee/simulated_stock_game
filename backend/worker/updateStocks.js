@@ -388,15 +388,53 @@ async function executeOrderFill(order, fillPrice, stockId) {
         });
       }
 
+      // Compute brokerage, charges, gst
+      const brokerage = Math.min(20, totalValue * 0.0005);
+      const charges = totalValue * 0.0002;
+      const gst = (brokerage + charges) * 0.18;
+      let pnl = 0;
+      if (order.side === "SELL") {
+        if (order.assetType === "STOCK" && order.stockId) {
+          const portfolio = await tx.portfolio.findFirst({ where: { userId: order.userId } });
+          if (portfolio) {
+            const holding = await tx.portfolioItem.findFirst({
+              where: { portfolioId: portfolio.id, stockId: order.stockId }
+            });
+            if (holding) {
+              pnl = (fillPrice - holding.avgBuyPrice) * order.qty;
+            }
+          }
+        } else if (order.assetType === "COMMODITY") {
+          const comm = await tx.commodity.findUnique({ where: { symbol: order.symbol } });
+          if (comm) {
+            const holding = await tx.commodityPortfolioItem.findFirst({
+              where: { userId: order.userId, commodityId: comm.id }
+            });
+            if (holding) {
+              pnl = (fillPrice - holding.avgBuyPrice) * order.qty;
+            }
+          }
+        }
+      }
+
       // 3) Record transaction logs
       await tx.transaction.create({
         data: {
           userId: order.userId,
-          stockId: order.stockId,
+          stockId: order.assetType === "STOCK" ? order.stockId : null,
           type: order.side === "BUY" ? "BUY" : "SELL",
           quantity: order.qty,
           price: fillPrice,
-          totalValue
+          totalValue,
+          assetType: order.assetType || "STOCK",
+          symbol: order.symbol,
+          brokerage,
+          charges,
+          gst,
+          profitOrLoss: pnl,
+          orderId: order.id,
+          status: "COMPLETED",
+          description: `Execution of pending ${order.side} order for ${order.qty} ${order.symbol}`
         }
       });
 

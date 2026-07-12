@@ -78,29 +78,15 @@ export const searchStocks = async (req, res) => {
 
 export const buyStock = async (req, res) => {
   try {
-    const { stockId, buyQuantity, currentPrice, mpin } = req.body;
+    const { stockId, buyQuantity, currentPrice } = req.body;
     const userId = req.user.id;
 
-    // Validate MPIN
-    const userWithMpin = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { mpin: true }
-    });
-
-    if (!userWithMpin || !userWithMpin.mpin) {
-      return res.status(400).json({ error: "Please set your transaction MPIN first." });
+    const stock = await prisma.stock.findUnique({ where: { id: stockId } });
+    if (!stock) {
+      return res.status(404).json({ error: "Stock not found" });
     }
+    const symbol = stock.symbol;
 
-    if (!mpin) {
-      return res.status(400).json({ error: "Please enter your transaction MPIN." });
-    }
-
-    const isMpinCorrect = await bcrypt.compare(mpin, userWithMpin.mpin);
-    if (!isMpinCorrect) {
-      return res.status(400).json({ error: "Incorrect transaction MPIN." });
-    }
-
-    console.log(userId);
     const quantity = Number(buyQuantity);
     const price = Number(currentPrice);
     if (isNaN(quantity) || isNaN(price) || quantity <= 0 || price <= 0) {
@@ -111,7 +97,6 @@ export const buyStock = async (req, res) => {
 
     const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({ where: { id: userId } });
-      console.log("User from DB:", user);
       if (!user || user.cashBalance < totalCost) {
         throw new Error("Insufficient funds");
       }
@@ -127,19 +112,18 @@ export const buyStock = async (req, res) => {
         where: { userId },
       });
 
-      // If no portfolio exists, create one
       if (!portfolio) {
         portfolio = await tx.portfolio.create({
           data: {
             userId,
-            name: "Default Portfolio", // or allow custom naming
+            name: "Default Portfolio",
           },
         });
       }
       let portfolioItem = await tx.portfolioItem.findFirst({
         where: { portfolioId: portfolio.id, stockId },
       });
-      console.log("Portfolio Item:", portfolioItem);
+      
       if (portfolioItem) {
         const newQuantity = portfolioItem.quantity + quantity;
         const newAvgPrice =
@@ -161,6 +145,11 @@ export const buyStock = async (req, res) => {
         });
       }
 
+      // Compute fees
+      const brokerage = Math.min(20, totalCost * 0.0005);
+      const charges = totalCost * 0.0002;
+      const gst = (brokerage + charges) * 0.18;
+
       // Record transaction
       await tx.transaction.create({
         data: {
@@ -170,12 +159,26 @@ export const buyStock = async (req, res) => {
           quantity,
           price,
           totalValue: totalCost,
+          assetType: "STOCK",
+          symbol,
+          brokerage,
+          charges,
+          gst,
+          status: "COMPLETED",
+          description: `Purchase of ${quantity} shares of ${symbol}`,
         },
       });
-      const transaction = await tx.transaction.findFirst({
-        where: { userId, stockId, type: "BUY" },
+
+      // Record audit log
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: "STOCK_BUY_SUCCESS",
+          ipAddress: req.ip || "127.0.0.1",
+          details: `Purchased ${quantity} shares of ${symbol} for ₹${totalCost.toFixed(2)}`,
+        },
       });
-      console.log("transaction created", transaction);
+
       return { portfolioItem };
     });
 
@@ -187,27 +190,14 @@ export const buyStock = async (req, res) => {
 
 export const sellStock = async (req, res) => {
   try {
-    const { stockId, sellQuantity, currentPrice, mpin } = req.body;
+    const { stockId, sellQuantity, currentPrice } = req.body;
     const userId = req.user.id;
 
-    // Validate MPIN
-    const userWithMpin = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { mpin: true }
-    });
-
-    if (!userWithMpin || !userWithMpin.mpin) {
-      return res.status(400).json({ error: "Please set your transaction MPIN first." });
+    const stock = await prisma.stock.findUnique({ where: { id: stockId } });
+    if (!stock) {
+      return res.status(404).json({ error: "Stock not found" });
     }
-
-    if (!mpin) {
-      return res.status(400).json({ error: "Please enter your transaction MPIN." });
-    }
-
-    const isMpinCorrect = await bcrypt.compare(mpin, userWithMpin.mpin);
-    if (!isMpinCorrect) {
-      return res.status(400).json({ error: "Incorrect transaction MPIN." });
-    }
+    const symbol = stock.symbol;
 
     const quantity = Number(sellQuantity);
     const price = Number(currentPrice);
@@ -230,6 +220,9 @@ export const sellStock = async (req, res) => {
         throw new Error("Not enough shares to sell");
       }
 
+      // Calculate profit/loss
+      const pnl = (price - portfolioItem.avgBuyPrice) * quantity;
+
       // Update holdings
       const newQuantity = portfolioItem.quantity - quantity;
       if (newQuantity === 0) {
@@ -247,6 +240,11 @@ export const sellStock = async (req, res) => {
         data: { cashBalance: { increment: totalGain } },
       });
 
+      // Compute fees
+      const brokerage = Math.min(20, totalGain * 0.0005);
+      const charges = totalGain * 0.0002;
+      const gst = (brokerage + charges) * 0.18;
+
       // Record transaction
       await tx.transaction.create({
         data: {
@@ -256,6 +254,24 @@ export const sellStock = async (req, res) => {
           quantity,
           price,
           totalValue: totalGain,
+          assetType: "STOCK",
+          symbol,
+          brokerage,
+          charges,
+          gst,
+          profitOrLoss: pnl,
+          status: "COMPLETED",
+          description: `Sale of ${quantity} shares of ${symbol}`,
+        },
+      });
+
+      // Record audit log
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: "STOCK_SELL_SUCCESS",
+          ipAddress: req.ip || "127.0.0.1",
+          details: `Sold ${quantity} shares of ${symbol} for ₹${totalGain.toFixed(2)}. P&L: ₹${pnl.toFixed(2)}`,
         },
       });
 

@@ -129,9 +129,20 @@ export default function UserProfile({ onClose }) {
           <div className="space-y-1.5 pt-2 border-t border-gray-100">
             <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2 px-1">Actions</span>
 
-            <button className="w-full flex items-center gap-3 text-gray-600 hover:bg-slate-50 px-3.5 py-2.5 rounded-xl text-sm font-medium transition">
+            <button 
+              onClick={() => handleNavigate("/orders")}
+              className="w-full flex items-center gap-3 text-gray-600 hover:bg-slate-50 px-3.5 py-2.5 rounded-xl text-sm font-medium transition"
+            >
               <ClipboardList className="w-4.5 h-4.5 text-gray-400" />
               <span>All Orders</span>
+            </button>
+
+            <button 
+              onClick={() => handleNavigate("/transactions")}
+              className="w-full flex items-center gap-3 text-gray-600 hover:bg-slate-50 px-3.5 py-2.5 rounded-xl text-sm font-medium transition"
+            >
+              <FileText className="w-4.5 h-4.5 text-gray-400" />
+              <span>Transaction History</span>
             </button>
 
             <button className="w-full flex items-center gap-3 text-gray-600 hover:bg-slate-50 px-3.5 py-2.5 rounded-xl text-sm font-medium transition">

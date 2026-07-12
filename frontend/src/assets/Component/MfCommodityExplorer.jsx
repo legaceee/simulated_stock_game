@@ -14,6 +14,7 @@ import {
   Calculator
 } from "lucide-react";
 import MpinModal from "./MpinModal";
+import { io } from "socket.io-client";
 
 export default function MfCommodityExplorer({ token, user, refreshUser, activeSubTab }) {
   // Mutual Funds States
@@ -50,6 +51,45 @@ export default function MfCommodityExplorer({ token, user, refreshUser, activeSu
   useEffect(() => {
     fetchData();
   }, [activeSubTab]);
+
+  // Subscribe to live commodity prices
+  useEffect(() => {
+    if (activeSubTab !== "commodities" || commodities.length === 0) return;
+
+    const socket = io("http://localhost:4000");
+
+    socket.on("connect", () => {
+      const symbols = commodities.map(c => c.symbol);
+      socket.emit("subscribe", symbols);
+    });
+
+    socket.on("price-update", (updates) => {
+      if (!updates || updates.length === 0) return;
+      
+      setCommodities((prev) => {
+        return prev.map(comm => {
+          const match = updates.find(u => u.symbol === comm.symbol);
+          if (match) {
+            return { ...comm, currentPrice: match.price };
+          }
+          return comm;
+        });
+      });
+
+      setSelectedComm((prevSelected) => {
+        if (!prevSelected) return prevSelected;
+        const match = updates.find(u => u.symbol === prevSelected.symbol);
+        if (match) {
+          return { ...prevSelected, currentPrice: match.price };
+        }
+        return prevSelected;
+      });
+    });
+
+    return () => {
+      socket.disconnect();
+    };
+  }, [activeSubTab, commodities.length]);
 
   const fetchData = async () => {
     if (!token) return;
@@ -149,6 +189,14 @@ export default function MfCommodityExplorer({ token, user, refreshUser, activeSu
         const res = await axios.post(
           "http://localhost:4000/api/v1/mf/sip",
           { fundId: ctx.asset.id, amount: investAmount, frequency: sipFrequency, mpin },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setMessage(res.data.message);
+        setSelectedFund(null);
+      } else if (ctx.type === "mf_redeem") {
+        const res = await axios.post(
+          "http://localhost:4000/api/v1/mf/redeem",
+          { fundId: ctx.asset.id, units: ctx.asset.units, mpin },
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setMessage(res.data.message);
@@ -411,12 +459,18 @@ export default function MfCommodityExplorer({ token, user, refreshUser, activeSu
                     </div>
                   )}
 
-                  <button
-                    type="submit"
-                    className="w-full bg-green-500 hover:bg-green-600 text-white font-extrabold py-3.5 rounded-xl transition cursor-pointer text-sm shadow-md"
-                  >
-                    {mfMode === "BUY_LUMPSUM" ? "INVEST LUMPSUM" : "ESTABLISH SIP PLAN"}
-                  </button>
+                  {user && user.kycStatus === "APPROVED" ? (
+                    <button
+                      type="submit"
+                      className="w-full bg-green-500 hover:bg-green-600 text-white font-extrabold py-3.5 rounded-xl transition cursor-pointer text-sm shadow-md"
+                    >
+                      {mfMode === "BUY_LUMPSUM" ? "INVEST LUMPSUM" : "ESTABLISH SIP PLAN"}
+                    </button>
+                  ) : (
+                    <div className="w-full text-center p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold rounded-xl space-y-2">
+                      <p>Complete and verify your KYC to start investing.</p>
+                    </div>
+                  )}
                 </form>
               </div>
             )}
@@ -458,6 +512,29 @@ export default function MfCommodityExplorer({ token, user, refreshUser, activeSu
                             {hold.returnsPercentage.toFixed(2)}%
                           </span>
                         </div>
+                        {user && user.kycStatus === "APPROVED" && (
+                          <div className="flex justify-end pt-1 border-t border-slate-50">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const redeemAmt = prompt(`Enter units to redeem (Max ${hold.units.toFixed(4)}):`);
+                                const val = parseFloat(redeemAmt);
+                                if (!isNaN(val) && val > 0 && val <= hold.units) {
+                                  setSecurityContext({
+                                    type: "mf_redeem",
+                                    asset: { id: hold.fundId, name: hold.name, units: val }
+                                  });
+                                  setShowMpinModal(true);
+                                } else if (redeemAmt !== null) {
+                                  alert("Invalid quantity of units entered.");
+                                }
+                              }}
+                              className="text-amber-600 hover:text-amber-700 font-extrabold text-[10px] uppercase cursor-pointer"
+                            >
+                              Redeem Units
+                            </button>
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -659,14 +736,20 @@ export default function MfCommodityExplorer({ token, user, refreshUser, activeSu
                     </div>
                   </div>
 
-                  <button
-                    type="submit"
-                    className={`w-full text-white font-extrabold py-3.5 rounded-xl transition cursor-pointer text-sm shadow-md ${
-                      commAction === "BUY" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"
-                    }`}
-                  >
-                    {commAction === "BUY" ? "EXECUTE PURCHASE" : "EXECUTE SELL"}
-                  </button>
+                  {user && user.kycStatus === "APPROVED" ? (
+                    <button
+                      type="submit"
+                      className={`w-full text-white font-extrabold py-3.5 rounded-xl transition cursor-pointer text-sm shadow-md ${
+                        commAction === "BUY" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"
+                      }`}
+                    >
+                      {commAction === "BUY" ? "EXECUTE PURCHASE" : "EXECUTE SELL"}
+                    </button>
+                  ) : (
+                    <div className="w-full text-center p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold rounded-xl space-y-2">
+                      <p>Complete and verify your KYC to start investing.</p>
+                    </div>
+                  )}
                 </form>
               </div>
             ) : (

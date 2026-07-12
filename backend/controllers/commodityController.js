@@ -89,21 +89,14 @@ export const getCommodityHoldings = CatchAsync(async (req, res, next) => {
   });
 });
 
-// 3. Buy Commodity
+// 3) Buy Commodity
 export const buyCommodity = CatchAsync(async (req, res, next) => {
   const userId = req.user.id;
-  const { commodityId, quantity, mpin } = req.body;
+  const { commodityId, quantity } = req.body;
 
   const buyQty = parseFloat(quantity);
   if (isNaN(buyQty) || buyQty <= 0) {
     return next(new AppError("Please provide a valid quantity to buy.", 400));
-  }
-
-  // Verify MPIN
-  try {
-    await checkUserMpin(userId, mpin);
-  } catch (err) {
-    return next(new AppError(err.message, 401));
   }
 
   const comm = await prisma.commodity.findUnique({ where: { id: commodityId } });
@@ -152,6 +145,11 @@ export const buyCommodity = CatchAsync(async (req, res, next) => {
       });
     }
 
+    // Calculate fees
+    const brokerage = Math.min(20, totalCost * 0.0005);
+    const charges = totalCost * 0.0002;
+    const gst = (brokerage + charges) * 0.18;
+
     // 3) Record transaction
     await tx.transaction.create({
       data: {
@@ -160,7 +158,13 @@ export const buyCommodity = CatchAsync(async (req, res, next) => {
         price: comm.currentPrice,
         quantity: Math.round(buyQty * 1000) / 1000,
         totalValue: totalCost,
-        // Since transactions don't link commodityId directly in this schema, we record details in logs
+        assetType: "COMMODITY",
+        symbol: comm.symbol,
+        brokerage,
+        charges,
+        gst,
+        status: "COMPLETED",
+        description: `Purchase of ${buyQty} ${comm.unit} of ${comm.symbol}`
       }
     });
 
@@ -187,18 +191,11 @@ export const buyCommodity = CatchAsync(async (req, res, next) => {
 // 4. Sell Commodity
 export const sellCommodity = CatchAsync(async (req, res, next) => {
   const userId = req.user.id;
-  const { commodityId, quantity, mpin } = req.body;
+  const { commodityId, quantity } = req.body;
 
   const sellQty = parseFloat(quantity);
   if (isNaN(sellQty) || sellQty <= 0) {
     return next(new AppError("Please provide a valid quantity to sell.", 400));
-  }
-
-  // Verify MPIN
-  try {
-    await checkUserMpin(userId, mpin);
-  } catch (err) {
-    return next(new AppError(err.message, 401));
   }
 
   const comm = await prisma.commodity.findUnique({ where: { id: commodityId } });
@@ -227,7 +224,7 @@ export const sellCommodity = CatchAsync(async (req, res, next) => {
     const newQty = holding.quantity - sellQty;
     let updatedHolding = null;
 
-    if (newQty <= 0.0001) { // Floating point safety margin
+    if (newQty <= 0.0001) {
       await tx.commodityPortfolioItem.delete({
         where: { id: holding.id }
       });
@@ -238,6 +235,12 @@ export const sellCommodity = CatchAsync(async (req, res, next) => {
       });
     }
 
+    // Calculate fees & PNL
+    const brokerage = Math.min(20, totalGain * 0.0005);
+    const charges = totalGain * 0.0002;
+    const gst = (brokerage + charges) * 0.18;
+    const pnl = (comm.currentPrice - holding.avgBuyPrice) * sellQty;
+
     // 3) Record transaction
     await tx.transaction.create({
       data: {
@@ -246,6 +249,14 @@ export const sellCommodity = CatchAsync(async (req, res, next) => {
         price: comm.currentPrice,
         quantity: Math.round(sellQty * 1000) / 1000,
         totalValue: totalGain,
+        assetType: "COMMODITY",
+        symbol: comm.symbol,
+        brokerage,
+        charges,
+        gst,
+        profitOrLoss: pnl,
+        status: "COMPLETED",
+        description: `Sale of ${sellQty} ${comm.unit} of ${comm.symbol}`
       }
     });
 
@@ -255,7 +266,7 @@ export const sellCommodity = CatchAsync(async (req, res, next) => {
         userId,
         action: "COMMODITY_SELL_SUCCESS",
         ipAddress: req.ip || "127.0.0.1",
-        details: `Sold ${sellQty} ${comm.unit} of ${comm.symbol} for ₹${totalGain.toFixed(2)}`,
+        details: `Sold ${sellQty} ${comm.unit} of ${comm.symbol} for ₹${totalGain.toFixed(2)}. P&L: ₹${pnl.toFixed(2)}`,
       }
     });
 

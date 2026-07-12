@@ -1,1 +1,1 @@
-export { requireAuth as protect, requireAdmin as adminOnly, requireKycApproved } from "./authMiddleware.js";
+export { requireAuth as protect, requireAdmin as adminOnly, requireKycApproved, requireKycApproval, requireMpin, requireWalletBalance, requireTradingHours, requireMarketStatus } from "./authMiddleware.js";

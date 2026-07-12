@@ -51,6 +51,23 @@ export default function KycFlow() {
     }
   }, [token, navigate]);
 
+  // Sync step with KYC Status
+  useEffect(() => {
+    if (user) {
+      if (user.kycStatus === "PENDING") {
+        setStep(6);
+      } else if (user.kycStatus === "REJECTED") {
+        setStep(7);
+      } else if (user.kycStatus === "APPROVED") {
+        if (user.mpin) {
+          setStep(5);
+        } else {
+          setStep(4);
+        }
+      }
+    }
+  }, [user]);
+
   // Handle drawing on signature canvas
   useEffect(() => {
     if (step === 3 && canvasRef.current) {
@@ -528,6 +545,49 @@ export default function KycFlow() {
                 className="w-full bg-slate-900 hover:bg-slate-950 text-white font-extrabold py-3.5 rounded-xl shadow-lg transition cursor-pointer text-sm"
               >
                 GO TO TRADING DASHBOARD
+              </button>
+            </div>
+          )}
+
+          {/* STEP 6: KYC Pending Review Screen */}
+          {step === 6 && (
+            <div className="flex flex-col items-center text-center py-6">
+              <div className="w-16 h-16 bg-amber-50 text-amber-600 flex items-center justify-center rounded-3xl mb-4 shadow-inner">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-extrabold text-slate-800 mb-2">KYC Under Review</h2>
+              <p className="text-xs text-gray-400 max-w-[380px] mb-8 leading-relaxed font-semibold text-amber-600">
+                Your documents have been submitted and are currently being reviewed by our verification team. 
+                This normally takes under 24 hours. You will receive full trading access once verified.
+              </p>
+              <button
+                onClick={async () => {
+                  setLoading(true);
+                  await refreshUser();
+                  setLoading(false);
+                }}
+                className="w-full bg-green-500 hover:bg-green-600 text-white font-extrabold py-3.5 rounded-xl transition text-sm cursor-pointer"
+              >
+                {loading ? "Checking..." : "REFRESH STATUS"}
+              </button>
+            </div>
+          )}
+
+          {/* STEP 7: KYC Rejected Screen */}
+          {step === 7 && (
+            <div className="flex flex-col items-center text-center py-6">
+              <div className="w-16 h-16 bg-rose-50 text-rose-600 flex items-center justify-center rounded-3xl mb-4 shadow-inner">
+                <AlertCircle className="w-8 h-8" />
+              </div>
+              <h2 className="text-2xl font-extrabold text-slate-800 mb-2">KYC Verification Failed</h2>
+              <p className="text-xs text-gray-400 max-w-[380px] mb-8 leading-relaxed font-semibold text-rose-500">
+                Unfortunately, your verification was rejected. Please review your details and re-submit your documents.
+              </p>
+              <button
+                onClick={() => setStep(1)}
+                className="w-full bg-slate-900 hover:bg-slate-950 text-white font-extrabold py-3.5 rounded-xl transition text-sm cursor-pointer"
+              >
+                RE-SUBMIT KYC
               </button>
             </div>
           )}

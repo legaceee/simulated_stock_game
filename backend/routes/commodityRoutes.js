@@ -1,5 +1,12 @@
 import express from "express";
-import { protect, requireKycApproved } from "../middlewares/auth.js";
+import {
+  protect,
+  requireKycApproved,
+  requireMpin,
+  requireWalletBalance,
+  requireTradingHours,
+  requireMarketStatus
+} from "../middlewares/auth.js";
 import {
   getAllCommodities,
   getCommodityHoldings,
@@ -14,7 +21,7 @@ router.get("/", protect, getAllCommodities);
 router.get("/holdings", protect, getCommodityHoldings);
 
 // Trading / execution (authenticated & KYC approved)
-router.post("/buy", protect, requireKycApproved, buyCommodity);
-router.post("/sell", protect, requireKycApproved, sellCommodity);
+router.post("/buy", protect, requireKycApproved, requireMpin, requireWalletBalance, requireTradingHours, requireMarketStatus, buyCommodity);
+router.post("/sell", protect, requireKycApproved, requireMpin, requireTradingHours, requireMarketStatus, sellCommodity);
 
 export default router;

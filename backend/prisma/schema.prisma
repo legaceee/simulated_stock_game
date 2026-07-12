@@ -137,17 +137,27 @@ model PortfolioItem {
 }
 
 model Transaction {
-  id         String          @id @default(uuid())
-  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId     String
-  stockId    String?
-  amount     Float?
-  type       TransactionType
-  quantity   Int?
-  price      Float?
-  totalValue Float?
-  createdAt  DateTime        @default(now())
-  stock      Stock?          @relation(fields: [stockId], references: [id])
+  id           String          @id @default(uuid())
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId       String
+  stockId      String?
+  amount       Float?
+  type         TransactionType
+  quantity     Float?
+  price        Float?
+  totalValue   Float?
+  assetType    String?         @default("STOCK") // STOCK, COMMODITY, MUTUAL_FUND, WALLET
+  symbol       String?
+  brokerage    Float?          @default(0)
+  charges      Float?          @default(0)
+  gst          Float?          @default(0)
+  profitOrLoss Float?          @default(0)
+  nav          Float?
+  orderId      String?
+  status       String?         @default("COMPLETED")
+  description  String?
+  createdAt    DateTime        @default(now())
+  stock        Stock?          @relation(fields: [stockId], references: [id])
   @@index([userId, createdAt])
 }
 

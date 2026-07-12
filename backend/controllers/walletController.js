@@ -4,7 +4,6 @@ export const addCash = async (req, res) => {
   try {
     const { amount } = req.body;
     const userId = req.user.id;
-    console.log("JWT_SECRET:", process.env.JWT_SECRET);
 
     if (!amount || amount <= 0)
       return res.status(400).json({ message: "Invalid amount" });
@@ -15,10 +14,27 @@ export const addCash = async (req, res) => {
         data: { cashBalance: { increment: amount } },
         select: { id: true, cashBalance: true },
       });
-      console.log("User after cash update:", user);
 
       await tx.transaction.create({
-        data: { userId, type: "DEPOSIT", amount },
+        data: {
+          userId,
+          type: "DEPOSIT",
+          amount,
+          totalValue: amount,
+          assetType: "WALLET",
+          symbol: "WALLET",
+          status: "COMPLETED",
+          description: "Deposit Funds via NetBanking"
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: "WALLET_DEPOSIT_SUCCESS",
+          ipAddress: req.ip || "127.0.0.1",
+          details: `Deposited ₹${amount.toFixed(2)} into wallet.`
+        }
       });
 
       return user;
@@ -48,7 +64,25 @@ export const withdrawCash = async (req, res) => {
       });
 
       await tx.transaction.create({
-        data: { userId, type: "WITHDRAW", amount },
+        data: {
+          userId,
+          type: "WITHDRAW",
+          amount,
+          totalValue: amount,
+          assetType: "WALLET",
+          symbol: "WALLET",
+          status: "COMPLETED",
+          description: "Withdraw Funds to Bank"
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId,
+          action: "WALLET_WITHDRAW_SUCCESS",
+          ipAddress: req.ip || "127.0.0.1",
+          details: `Withdrew ₹${amount.toFixed(2)} from wallet.`
+        }
       });
 
       return updated;

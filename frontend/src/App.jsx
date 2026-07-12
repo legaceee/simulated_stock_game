@@ -13,6 +13,8 @@ import Leaderboard from "./pages/Leaderboard";
 import Stocks from "./pages/Stocks";
 import DevDashboard from "./pages/DevDashboard";
 import KycFlow from "./pages/KycFlow";
+import Transactions from "./pages/Transactions";
+import OrderHistory from "./pages/OrderHistory";
 const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 function App() {
@@ -30,6 +32,8 @@ function App() {
               <Route path="/stocks" element={<Stocks />} />
               <Route path="/developer" element={<DevDashboard />} />
               <Route path="/kyc" element={<KycFlow />} />
+              <Route path="/transactions" element={<Transactions />} />
+              <Route path="/orders" element={<OrderHistory />} />
             </Routes>
             <ModalRoot />
           </ModalProvider>

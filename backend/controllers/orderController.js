@@ -48,12 +48,7 @@ export const placeOrder = CatchAsync(async (req, res, next) => {
     return next(new AppError("Quantity must be a positive integer.", 400));
   }
 
-  // Validate MPIN
-  try {
-    await checkUserMpin(userId, mpin);
-  } catch (err) {
-    return next(new AppError(err.message, 401));
-  }
+  // MPIN check is handled by middleware
 
   // Determine current price from DB
   let currentPrice = 0;
@@ -134,6 +129,11 @@ export const placeOrder = CatchAsync(async (req, res, next) => {
           }
         }
 
+        // Compute fees
+        const brokerage = Math.min(20, totalValue * 0.0005);
+        const charges = totalValue * 0.0002;
+        const gst = (brokerage + charges) * 0.18;
+
         // Record transaction
         await tx.transaction.create({
           data: {
@@ -142,7 +142,14 @@ export const placeOrder = CatchAsync(async (req, res, next) => {
             type: "BUY",
             quantity: orderQty,
             price: executionPrice,
-            totalValue
+            totalValue,
+            assetType,
+            symbol: symbol.toUpperCase(),
+            brokerage,
+            charges,
+            gst,
+            status: "COMPLETED",
+            description: `Market Buy of ${orderQty} ${symbol.toUpperCase()}`
           }
         });
       } else {
@@ -191,6 +198,29 @@ export const placeOrder = CatchAsync(async (req, res, next) => {
           data: { cashBalance: { increment: totalValue } }
         });
 
+        // Compute fees & PNL
+        const brokerage = Math.min(20, totalValue * 0.0005);
+        const charges = totalValue * 0.0002;
+        const gst = (brokerage + charges) * 0.18;
+        let pnl = 0;
+        if (assetType === "STOCK") {
+          const portfolio = await tx.portfolio.findFirst({ where: { userId } });
+          const holding = portfolio
+            ? await tx.portfolioItem.findFirst({ where: { portfolioId: portfolio.id, stockId } })
+            : null;
+          if (holding) {
+            pnl = (executionPrice - holding.avgBuyPrice) * orderQty;
+          }
+        } else if (assetType === "COMMODITY") {
+          const comm = await tx.commodity.findUnique({ where: { symbol: symbol.toUpperCase() } });
+          const holding = comm
+            ? await tx.commodityPortfolioItem.findFirst({ where: { userId, commodityId: comm.id } })
+            : null;
+          if (holding) {
+            pnl = (executionPrice - holding.avgBuyPrice) * orderQty;
+          }
+        }
+
         // Record transaction
         await tx.transaction.create({
           data: {
@@ -199,7 +229,15 @@ export const placeOrder = CatchAsync(async (req, res, next) => {
             type: "SELL",
             quantity: orderQty,
             price: executionPrice,
-            totalValue
+            totalValue,
+            assetType,
+            symbol: symbol.toUpperCase(),
+            brokerage,
+            charges,
+            gst,
+            profitOrLoss: pnl,
+            status: "COMPLETED",
+            description: `Market Sell of ${orderQty} ${symbol.toUpperCase()}`
           }
         });
       }
@@ -312,18 +350,44 @@ export const placeOrder = CatchAsync(async (req, res, next) => {
   });
 });
 
-// Retrieve User's Order History
+// Retrieve User's Order History (Paginated & Filtered)
 export const getMyOrders = CatchAsync(async (req, res, next) => {
   const userId = req.user.id;
+  const { page = 1, limit = 10, status, side, search, sortBy = "createdAt", sortOrder = "desc" } = req.query;
+
+  const skip = (parseInt(page, 10) - 1) * parseInt(limit, 10);
+  const take = parseInt(limit, 10);
+
+  const whereClause = { userId };
+
+  if (status) {
+    whereClause.status = status.toUpperCase();
+  }
+  if (side) {
+    whereClause.side = side.toUpperCase();
+  }
+  if (search) {
+    whereClause.symbol = { contains: search.toUpperCase(), mode: "insensitive" };
+  }
 
   const orders = await prisma.order.findMany({
-    where: { userId },
-    orderBy: { createdAt: "desc" }
+    where: whereClause,
+    orderBy: { [sortBy]: sortOrder },
+    skip,
+    take
   });
+
+  const totalCount = await prisma.order.count({ where: whereClause });
 
   res.status(200).json({
     status: "success",
     results: orders.length,
+    pagination: {
+      page: parseInt(page, 10),
+      limit: parseInt(limit, 10),
+      totalCount,
+      totalPages: Math.ceil(totalCount / take)
+    },
     data: { orders }
   });
 });

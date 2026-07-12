@@ -162,6 +162,18 @@ export const setMpin = CatchAsync(async (req, res, next) => {
   const userId = req.user.id;
   const { mpin } = req.body;
 
+  if (req.user.kycStatus !== "APPROVED") {
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        action: "UNAUTHORIZED_MPIN_ATTEMPT",
+        ipAddress: req.ip || "127.0.0.1",
+        details: "Blocked attempt to set MPIN before KYC approval."
+      }
+    });
+    return next(new AppError("KYC verification is mandatory before you can create an MPIN.", 403));
+  }
+
   if (!mpin || !/^\d{6}$/.test(mpin)) {
     return next(new AppError("MPIN must be a 6-digit number", 400));
   }

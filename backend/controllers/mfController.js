@@ -92,18 +92,11 @@ export const getMfHoldings = CatchAsync(async (req, res, next) => {
 // 3. Buy Mutual Fund (Lumpsum)
 export const placeLumpsum = CatchAsync(async (req, res, next) => {
   const userId = req.user.id;
-  const { fundId, amount, mpin } = req.body;
+  const { fundId, amount } = req.body;
 
   const investAmount = parseFloat(amount);
   if (isNaN(investAmount) || investAmount <= 0) {
     return next(new AppError("Please provide a valid investment amount.", 400));
-  }
-
-  // Enforce MPIN
-  try {
-    await checkUserMpin(userId, mpin);
-  } catch (err) {
-    return next(new AppError(err.message, 401));
   }
 
   const fund = await prisma.mutualFund.findUnique({ where: { id: fundId } });
@@ -156,6 +149,11 @@ export const placeLumpsum = CatchAsync(async (req, res, next) => {
       });
     }
 
+    // Compute standard charges
+    const brokerage = 0;
+    const charges = investAmount * 0.00005; // stamp duty is 0.005%
+    const gst = charges * 0.18;
+
     // 4) Record transaction
     await tx.transaction.create({
       data: {
@@ -163,9 +161,15 @@ export const placeLumpsum = CatchAsync(async (req, res, next) => {
         type: "BUY",
         amount: investAmount,
         price: fund.nav,
-        quantity: Math.round(unitsBought * 1000) / 1000, // round to 3 decimals
+        quantity: Math.round(unitsBought * 1000) / 1000,
         totalValue: investAmount,
-        // Since transaction holds stockId, we can add mutualFund/commodity tags in details if needed
+        assetType: "MUTUAL_FUND",
+        symbol: fund.symbol,
+        brokerage,
+        charges,
+        gst,
+        status: "COMPLETED",
+        description: `Lumpsum investment in ${fund.name}`
       }
     });
 
@@ -192,7 +196,7 @@ export const placeLumpsum = CatchAsync(async (req, res, next) => {
 // 4. Create Mutual Fund SIP
 export const createSip = CatchAsync(async (req, res, next) => {
   const userId = req.user.id;
-  const { fundId, amount, frequency, mpin } = req.body; // DAILY, WEEKLY, MONTHLY
+  const { fundId, amount, frequency } = req.body; // DAILY, WEEKLY, MONTHLY
 
   const sipAmount = parseFloat(amount);
   if (isNaN(sipAmount) || sipAmount <= 0) {
@@ -201,13 +205,6 @@ export const createSip = CatchAsync(async (req, res, next) => {
 
   if (!["DAILY", "WEEKLY", "MONTHLY"].includes(frequency)) {
     return next(new AppError("Invalid frequency. Must be DAILY, WEEKLY, or MONTHLY.", 400));
-  }
-
-  // Enforce MPIN
-  try {
-    await checkUserMpin(userId, mpin);
-  } catch (err) {
-    return next(new AppError(err.message, 401));
   }
 
   const fund = await prisma.mutualFund.findUnique({ where: { id: fundId } });
@@ -299,5 +296,103 @@ export const cancelSip = CatchAsync(async (req, res, next) => {
   res.status(200).json({
     status: "success",
     message: "SIP plan cancelled successfully."
+  });
+});
+
+// 7. Redeem Mutual Fund units
+export const redeemMf = CatchAsync(async (req, res, next) => {
+  const userId = req.user.id;
+  const { fundId, units } = req.body;
+
+  const redeemUnits = parseFloat(units);
+  if (isNaN(redeemUnits) || redeemUnits <= 0) {
+    return next(new AppError("Please provide a valid quantity of units to redeem.", 400));
+  }
+
+  const fund = await prisma.mutualFund.findUnique({ where: { id: fundId } });
+  if (!fund) {
+    return next(new AppError("Mutual fund not found.", 404));
+  }
+
+  const proceeds = redeemUnits * fund.nav;
+
+  const result = await prisma.$transaction(async (tx) => {
+    const holding = await tx.mfPortfolioItem.findFirst({
+      where: { userId, fundId }
+    });
+
+    if (!holding || holding.units < redeemUnits) {
+      throw new Error(`Insufficient mutual fund units. You own ${holding ? holding.units : 0} units.`);
+    }
+
+    // 1) Credit balance
+    await tx.user.update({
+      where: { id: userId },
+      data: { cashBalance: { increment: proceeds } }
+    });
+
+    // 2) Update or Delete holding
+    const newUnits = holding.units - redeemUnits;
+    let updatedHolding = null;
+
+    if (newUnits <= 0.0001) {
+      await tx.mfPortfolioItem.delete({
+        where: { id: holding.id }
+      });
+    } else {
+      const reductionRatio = redeemUnits / holding.units;
+      const newInvestedValue = holding.investedValue * (1 - reductionRatio);
+      
+      updatedHolding = await tx.mfPortfolioItem.update({
+        where: { id: holding.id },
+        data: {
+          units: newUnits,
+          investedValue: newInvestedValue
+        }
+      });
+    }
+
+    const brokerage = 0;
+    const charges = proceeds * 0.00005; // stamp/transaction charges
+    const gst = charges * 0.18;
+    const pnl = proceeds - (holding.avgNav * redeemUnits);
+
+    // 3) Record transaction
+    await tx.transaction.create({
+      data: {
+        userId,
+        type: "SELL",
+        price: fund.nav,
+        quantity: Math.round(redeemUnits * 1000) / 1000,
+        totalValue: proceeds,
+        amount: proceeds,
+        assetType: "MUTUAL_FUND",
+        symbol: fund.symbol,
+        brokerage,
+        charges,
+        gst,
+        profitOrLoss: pnl,
+        status: "COMPLETED",
+        description: `Redeemed ${redeemUnits.toFixed(4)} units of ${fund.symbol}`
+      }
+    });
+
+    // 4) Record Audit Log
+    await tx.auditLog.create({
+      data: {
+        userId,
+        action: "MF_REDEMPTION_SUCCESS",
+        ipAddress: req.ip || "127.0.0.1",
+        details: `Redeemed ${redeemUnits.toFixed(4)} units of ${fund.symbol} for ₹${proceeds.toFixed(2)}. P&L: ₹${pnl.toFixed(2)}`,
+      }
+    });
+
+    return updatedHolding;
+  });
+
+  res.status(200).json({
+    status: "success",
+    message: `Successfully redeemed ${redeemUnits.toFixed(4)} units of ${fund.name}!`,
+    data: result
   });
 });
